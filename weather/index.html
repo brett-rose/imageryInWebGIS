@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>NDFD Weather Service</title>
+  <meta charset="windows-1252">
+  <meta name="viewport" content="width=device-width">
+  <style>
+    html, body, #map, #main {
+      height: 100%;
+      width: 100%;
+      margin: 0 !important;
+      padding: 0 !important;
+      gutters: false;
+    }
+
+    #radioForm {
+      position: absolute;
+      top: 0px;
+      right: 0px;
+      height: 380px;
+      width: 180px;
+      border: 1px solid #AFAFAF;
+      background-color: #C2E0FF;
+    }
+  </style>
+  <link rel="stylesheet" href="http://js.arcgis.com/3.15/dijit/themes/claro/claro.css">
+  <link rel="stylesheet" href="http://js.arcgis.com/3.15/esri/css/esri.css">
+  <link rel="stylesheet" href="http://js.arcgis.com/3.15/dojox/layout/resources/FloatingPane.css">
+  <script type="text/javascript">
+    var dojoConfig = {
+      parseOnLoad: true,
+    };
+  </script>
+  <script type="text/javascript" src="http://js.arcgis.com/3.15/"></script>
+  <script type="text/javascript">
+    var ProcessFun, windArrow;
+    require(["dojo/ready",
+      "dojo/parser",
+      "esri/map",
+      "esri/layers/ArcGISImageServiceLayer",
+      "esri/layers/RasterFunction",
+      "esri/layers/ArcGISImageServiceVectorLayer",
+      "esri/renderers/VectorFieldRenderer",
+      "esri/layers/ImageServiceParameters",
+      "dojo/dnd/Moveable",
+      "dojo/_base/url",
+      "esri/request",
+      "esri/dijit/TimeSlider",
+      "dojo/_base/array",
+      "dojo/Deferred",
+      "dijit/registry",
+      "esri/graphic",
+      "esri/symbols/SimpleMarkerSymbol",
+      "dojox/charting/Chart",
+      "dojox/charting/axis2d/Default",
+      "dojox/charting/plot2d/Markers",
+      "dojox/charting/themes/PurpleRain",
+      "dojox/charting/action2d/Tooltip",
+      "dojo/dom-style",
+  "dojo/dom",
+  "esri/domUtils",
+      "dijit/layout/BorderContainer",
+      "dijit/layout/ContentPane",
+      "dojox/layout/FloatingPane",
+      "dojo/domReady!"],
+            function (ready, parser, Map, ImageServiceLayer, RasterFunction, ArcGISImageServiceVectorLayer, VectorFieldRenderer, ImageServiceParameters, Moveable, Url,
+                    esriRequest, TimeSlider, array, Deferred, registry,
+                    Graphic, SimpleMarkerSymbol,
+                    Chart, Default, Markers, Wetland, Tooltip, domStyle, dom, esriDomUtils) {
+
+              ready(function () {
+                var map = new Map("map", {
+                  basemap: "topo",
+                  center: [-97, 38],
+                  zoom: 5
+                });
+
+                map.resize();
+
+                map.on("update-start", function () {
+                  esriDomUtils.show(dom.byId("map_draw_status"));
+                });
+                map.on("update-end", function () {
+                  esriDomUtils.hide(dom.byId("map_draw_status"));
+                });
+
+
+                function getParameterByName(name) {
+                  name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+                  var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+                          results = regex.exec(location.search);
+                  return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+                }
+
+                var isUrl = getParameterByName("isUrl");
+                var gsUrl = "http://sampleserver6.arcgisonline.com/arcgis/rest/services/Utilities/Geometry/GeometryServer";
+                //isUrl = "http://hakone5:6080/arcgis/rest/services/NDFD/ImageServer";
+                //var isUrl2 = "http://hakone5:6080/arcgis/rest/services/NDFD_wind/ImageServer";
+                isUrl = "http://ec2-54-196-229-92.compute-1.amazonaws.com:6080/arcgis/rest/services/ScientificData/NDFD_model/ImageServer";
+                var isUrl2 = "http://ec2-54-196-229-92.compute-1.amazonaws.com:6080/arcgis/rest/services/ScientificData/NDFD_wind/ImageServer";
+                var timeSlider;
+
+                var corsEnabledServers, imageServiceAuthority, geometryServiceAuthority, exportWebmapServiceAuthority, onceDone;
+
+                imageServiceAuthority = new Url(isUrl).authority;
+                corsEnabledServers = esri.config.defaults.io.corsEnabledServers;
+                if (!corsEnabledServers.some(function (x) {
+                  return x === imageServiceAuthority;
+                })) {
+                  corsEnabledServers.push(imageServiceAuthority);
+                }
+
+                imageServiceAuthority = new Url(isUrl2).authority;
+                corsEnabledServers = esri.config.defaults.io.corsEnabledServers;
+                if (!corsEnabledServers.some(function (x) {
+                  return x === imageServiceAuthority;
+                })) {
+                  corsEnabledServers.push(imageServiceAuthority);
+                }
+
+                geometryServiceAuthority = new Url(gsUrl).authority;
+                if (!corsEnabledServers.some(function (x) {
+                  return x === geometryServiceAuthority;
+                })) {
+                  corsEnabledServers.push(geometryServiceAuthority);
+                }
+
+                //add image service layer
+                var isLayer = new ImageServiceLayer(isUrl);
+                map.addLayer(isLayer);
+                isLayer.setUseMapTime(true);
+
+                param = new ImageServiceParameters();
+                var isVectorLayer = new ArcGISImageServiceVectorLayer(isUrl2, { symbolTileSize: 30, imageServiceParameters: param, rendererStyle: "STYLE_SINGLE_ARROWS" });
+                var renderer = new VectorFieldRenderer({
+                  style: VectorFieldRenderer.STYLE_SINGLE_ARROWS,
+                  //style: VectorFieldRenderer.STYLE_BEAUFORT_KN,
+                  //visualVariables: visualVariables,
+                  flowRepresentation: VectorFieldRenderer.FLOW_FROM
+                });
+                isVectorLayer.setRenderer(renderer);
+
+                map.addLayer(isVectorLayer);
+                isVectorLayer.setUseMapTime(true);
+                isVectorLayer.hide();
+                isLayer.on("load", function () {
+                  //setISLayerExtent();
+
+                  var tsDiv = dojo.create("div", null, dojo.byId('timeSliderDiv'));
+
+                  timeSlider = new TimeSlider({
+                    id: 'timeSlider',
+                    style: 'width: 100%',
+                    thumbCount: 1,
+                    loop: true
+                  }, tsDiv);
+
+                  map.setTimeSlider(timeSlider);
+
+                  timeSlider.createTimeStopsByTimeInterval(isLayer.timeInfo.timeExtent, 3, "esriTimeUnitsHours");
+                  timeSlider.startup();
+
+                  setTimeString(map.timeExtent);
+                  timeSlider.on('time-extent-change', function (args) {
+                    setTimeString(args);
+                  });
+
+                });
+
+
+
+                function setTimeString(args) {
+                  dojo.byId("timeValue").innerHTML = "<b>Time: </b>" + (args.startTime.toUTCString().substring(5, 22) + " to " + args.endTime.toUTCString().substring(5, 22));
+                }
+
+                function setISLayerExtent() {
+                  if (isLayer.fullExtent.spatialReference.equals(map.spatialReference)) {
+                    map.setExtent(isLayer.fullExtent);
+                  } else {
+                    esriRequest({
+                      url: gsUrl + "/project",
+                      handleAs: "json",
+                      content: {
+                        f: "json",
+                        geometries: JSON.stringify({
+                          geometryType: "esriGeometryEnvelope",
+                          geometries: [isLayer.fullExtent.toJson()]
+                        }),
+                        inSR: JSON.stringify(isLayer.fullExtent.spatialReference.toJson()),
+                        outSR: JSON.stringify(map.spatialReference.toJson())
+                      },
+                      load: function (response) {
+                        map.setExtent(new Extent(response.geometries[0]).setSpatialReference(map.spatialReference));
+                      },
+                      error: function () {
+                      }
+                    });
+                  }
+                }
+                ProcessFun = function () {
+                  var rasterFun = new RasterFunction();
+                  if (dojo.byId('radioTemp').checked) {
+                    rasterFun.functionName = "Temperature (Kevin)";
+                  }
+                  if (dojo.byId('radioRH').checked) {
+                    rasterFun.functionName = "Humidity (%)";
+                  }
+                  if (dojo.byId('radioWindSpeed').checked) {
+                    rasterFun.functionName = 'Wind Speed (m/s)';
+                  }
+                  if (dojo.byId('radioHeatIndex').checked) {
+                    rasterFun.functionName = "Heat Index";
+                  }
+                  if (dojo.byId('radioWindChill').checked) {
+                    rasterFun.functionName = "Wind Chill";
+                  }
+                  //if (dojo.byId('radioFireWarning').checked) {
+                  //  rasterFun.functionName = "Fire Weather Forecast";
+                  //}
+                  if (dojo.byId('radioCompute').checked) {
+                    rasterFun.functionName = "RasterCalculator";
+                    rasterFun.functionArguments = {
+                      InputNames: ["T", "V", "H"],
+                      Expression: dojo.byId('textFormula').value,
+                      Rasters: ["$1", "$2", "$3"],
+                    };
+                  }
+                  isLayer.setRenderingRule(rasterFun);
+                }
+                windOn = function () {
+                  if (dojo.byId('CheckWind').checked == true) {
+                    isVectorLayer.show();
+                  }
+                  else {
+                    isVectorLayer.hide();
+                  }
+                }
+                //this is not used
+                function getTimeString(time) {
+                  var date = new Date(time);
+                  return (date.getUTCMonth() + "/" + date.getUTCDate());
+                };
+              });
+            });
+  </script>
+</head>
+<body class="claro">
+  <div id="main" data-dojo-type="dijit/layout/BorderContainer">
+    <div data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region:'center'" style='width: 100%!important; padding: 0!important;'>
+
+      <div id='map'>
+        <div id="map_draw_status" style="position:absolute;top:44.5%;left:46.5%;z-index:1000;display:none;">
+          <img src="//ajax.googleapis.com/ajax/libs/dojo/1.10.4/dijit/themes/claro/images/loadingAnimation.gif" alt="" />
+        </div>
+      </div>
+
+      <form id="radioForm">
+        </br>
+        <input type="radio" name="NDFD" id="radioTemp" checked value="Temperature" onclick="ProcessFun();"> <label>Temperature(T)</label>
+        </br></br>
+        <input type="radio" name="NDFD" id="radioRH" value="Humidity" onclick="ProcessFun();" /> <label>Humidity(H)</label> <br />
+        </br>
+        <input type="radio" name="NDFD" id="radioWindSpeed" value="WindSpeed" onclick="ProcessFun();"> <label>WindSpeed(V)</label> <br />
+        </br>
+        <input type="radio" name="NDFD" id="radioHeatIndex" value="HeatIndex" onclick="ProcessFun();" /> <label>Heat Index</label> <br />
+        </br>
+        <input type="radio" name="NDFD" id="radioWindChill" value="WindChill" onclick="ProcessFun();" /> <label>Wind Chill</label> <br />
+        </br>
+        <!--<input type="radio" name="NDFD" id="radioFireWarning" value="FireWarning" onclick="ProcessFun();" /> <label>Fire Warning</label> <br />
+        </br>-->
+        <!--<input type="radio" name="NDFD" id="Wind" value="Wind" onClick="windArrow();"><label>Wind</label> <br/>
+        </br>-->
+        <input type="radio" name="NDFD" id="radioCompute" value="Compute" onclick="ProcessFun();" /> <label>Compute</label>
+        <!--<input type="text" name="NDFD" style='width:136px' id = "textFormula" value = '35.74 + 0.6215 * T - 35.75 * Pow( V , 0.16 ) + 0.4275 * T * Pow(V , 0.16 )'/>-->
+        <!--<input type="text" name="NDFD" style='width:136px' id="textFormula" value='35.74 + 0.6215*T - 35.75*V**0.16 + 0.4275*T*V**0.16' />-->
+        <textarea rows="3" id="textFormula">35.74 + 0.6215*T - 35.75*V**0.16 + 0.4275*T*V**0.16</textarea>
+        </br></br>
+        <!--<input type="checkbox" name="NDFDWind" id="CheckWind" value="Wind" onclick="windOn();"><label>Wind</label><br />-->
+      </form>
+
+    </div>
+    <div data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region:'bottom'" style="height: 100px; background: #eeeeee; width: 100%!important;  padding: 0!important;">
+      <div style="width: 100%;" id="timeSliderDiv"></div>
+      <div id="timeValue" style='margin: 10px 0 0 400px;'></div>
+    </div>
+
+  </div>
+</body>
+</html>

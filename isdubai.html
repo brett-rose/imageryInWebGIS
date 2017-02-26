@@ -1,0 +1,271 @@
+﻿<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>Change Detection: Otsu's method</title>
+  <link rel="stylesheet" href="http://js.arcgis.com/3.17/dijit/themes/claro/claro.css">
+  <link rel="stylesheet" href="http://js.arcgis.com/3.17/esri/css/esri.css">
+  <style>
+    html, body {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    /*rounded
+             corners and opacity not supported in all browsers*/
+    .shadow {
+      padding: 8px;
+      -moz-border-radius: 6px;
+      -webkit-border-radius: 6px;
+      -moz-box-shadow: 0px 6px 3px -3px #888;
+      -webkit-box-shadow: 0px 6px 3px -3px #888;
+      box-shadow: 0px 6px 3px -3px #888;
+      background-color: white;
+    }
+
+    #searchWindow {
+      position: absolute;
+      left: 80px;
+      top: 25px;
+      z-index: 999;
+      text-align: left;
+    }
+
+    #floatingWindow {
+      position: absolute;
+      right: 25px;
+      top: 15px;
+      z-index: 998;
+      width: 260px;
+      -moz-border-radius: 10px;
+      -webkit-border-radius: 10px;
+      border: solid 3px #028482;
+      color: #000000;
+      padding: 10px;
+      font-family: "Tahoma";
+      text-align: left;
+    }
+
+    #title {
+      padding-left: 10px;
+    }
+
+    #description {
+      font-size: 12pt;
+      padding-left: 10px;
+    }
+
+
+    #divbasicFeatures {
+      font-size: 10pt;
+      padding: 10px;
+    }
+
+
+    #transparencySlider {
+      font-size: 8pt;
+      padding: 10px;
+    }
+
+    #map_draw_status{
+      position:absolute;
+      top:44.5%;
+      left:46.5%;
+      z-index:1000;
+      width:100px;
+      height:20px;
+      text-align:center;
+      background-color:ActiveCaption;
+    }
+    .collapse {
+      display:none;
+    }
+
+    .disabled {
+      color: #808080;
+      !important;
+    }
+  </style>
+  <script type="text/javascript">
+    var djConfig = {
+      parseOnLoad: false
+    };
+  </script>
+  <script type="text/javascript" src="//js.arcgis.com/3.17/">
+  </script>
+  <script type="text/javascript">
+    var imageServiceLayer, map, geocoder, params, mosaicRule, defaultMosaicRule, showChange;
+    var slopeRange = 90;
+    require(["dojo/parser", "dojo/dom-class",
+        "dojo/ready",
+        "esri/map", "esri/IdentityManager", "esri/dijit/Geocoder", "esri/layers/ArcGISTiledMapServiceLayer", "esri/layers/RasterLayer",
+  "esri/layers/RasterFunction", "esri/layers/ImageServiceParameters", "esri/layers/MosaicRule",
+    "esri/geometry/Extent", "esri/SpatialReference",
+    "dijit/form/RadioButton",
+    "dijit/form/CheckBox",
+    "dijit/form/TextBox",
+    "dijit/form/Button",
+    "dijit/layout/BorderContainer",
+    "dijit/layout/ContentPane",
+    "dijit/ProgressBar",
+    "dijit/form/HorizontalSlider", "dijit/form/HorizontalRule", "dijit/form/HorizontalRuleLabels", "dojox/form/RangeSlider", "dojox/gauges/GlossyCircularGauge", "dojo/on", "dojo/dom", "dijit/registry", "dojox/charting/widget/Chart2D", "dojox/charting/themes/Claro", "dojo/domReady!"
+    ], function (parser, domClass, ready, Map, esriId, Geocoder, ArcGISTiledMapServiceLayer, RasterLayer, RasterFunction, ImageServiceParameters, MosaicRule,
+Extent, SpatialReference, RadioButton, CheckBox, TextBox, Button, BorderContainer, ContentPane, ProgressBar, HorizontalSlider, HorizontalRule, HorizontalRuleLabels, RangeSlider, GlossyCircularGauge, on, dom, registry, Chart2D, Claro) {
+      parser.parse();
+      //16116 29859
+      esri.config.defaults.io.corsEnabledServers.push("http://localhost:6080");
+      esri.config.defaults.io.corsEnabledServers.push("http://sampleserver6.arcgisonline.com");
+      esri.config.defaults.io.corsEnabledServers.push("http://landsat.arcgis.com");
+      var initExtent = new Extent(6113153.028548971,2847729.1039719777,6209769.432301303,2897489.6093855603, new SpatialReference(3857));
+      var baseUrl = "http://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer";
+      var isUrl = "http://landsat.arcgis.com/arcgis/rest/services/LandsatGLS/MS/ImageServer";
+
+      map = new Map("map", {
+        wrapAround180: true,
+        extent: initExtent,
+      });
+      var basemap = new ArcGISTiledMapServiceLayer(baseUrl);
+      map.addLayer(basemap);
+      var params = new ImageServiceParameters();
+      //params.bandIds = [3,2,1];//natural color
+
+      var rasterFunction = new RasterFunction();
+      var arguments = {};
+      mosaicRule = new MosaicRule(
+                  {
+                    "method": "esriMosaicLockRaster",
+                    "lockRasterIds": [25859]
+                  });
+
+      defaultMosaicRule = new MosaicRule(
+                  {
+                    "mosaicMethod": "esriMosaicAttribute",
+                    "sortField": "acquisitionDate",
+                    "sortValue": "2020/12/31",
+                    "ascending": true,
+                    "mosaicOperation": "MT_FIRST"
+                  }); //latest on top
+      params.mosaicRule = defaultMosaicRule;
+	  params.format = "jpgpng";
+      imageServiceLayer = new RasterLayer(isUrl, { imageServiceParameters: params });
+      imageServiceLayer.setUseMapTime(true);
+      imageServiceLayer.setOpacity(1);
+      map.addLayer(imageServiceLayer);
+
+      geocoder = new Geocoder({
+        map: map
+      }, "search");
+      geocoder.startup();
+
+      showChange = function () {
+        var rf_dif = new RasterFunction();
+        rf_dif.functionName = "Arithmetic";
+        rf_dif.functionArguments = {
+          Raster: "$16116",
+          Raster2: "$25859",
+          "Operation": 2
+        };
+
+        var rf_binarization = new RasterFunction();
+        rf_binarization.functionName = "Threshold";
+        rf_binarization.functionArguments = {
+          ThresholdType: "1", //Otsu method
+          Raster: rf_dif
+        }
+
+        var rf_ba = new RasterFunction();
+        rf_ba.functionName = "BandArithmetic";
+        rf_ba.functionArguments = {
+          "Method": 0,
+          "BandIndexes": "B1 * B2 * B3 * B4 * B5 * B6",
+          "Raster": rf_binarization
+        };
+        rf_ba.outputPixelType = "U8";
+
+        var rf_render = new RasterFunction();
+        rf_render.functionName = "Colormap";
+        rf_render.functionArguments = {
+          "Colormap": [[1, 255, 0, 0]],
+          "Raster": rf_ba
+        };
+        rf_render.outputPixelType = "U8";
+
+
+
+        imageServiceLayer.setRenderingRule(rf_render);
+      }
+
+
+      map.on("update-start", function () {
+        domClass.remove("map_draw_status","collapse");
+      });
+      map.on("update-end", function () {
+        domClass.add("map_draw_status", "collapse");
+      });
+
+
+    });
+
+    function changeTransparency(val) {
+      document.getElementById("transparencyLabel").innerHTML = "Transparency :" + val.toFixed(0);
+      imageServiceLayer.setOpacity(1 - parseInt(val.toFixed(0)) / 100);
+    }
+
+    function showImage(val) {
+      if (val) {
+        mosaicRule.lockRasterIds = [val];
+        imageServiceLayer.setMosaicRule(mosaicRule, true);
+      }
+      else {
+        imageServiceLayer.setMosaicRule(defaultMosaicRule, true);
+      }
+      imageServiceLayer.setRenderingRule(null);
+    }
+  </script>
+</head>
+<body class="claro">
+  <div dojotype="dijit/layout/BorderContainer" design="headline" gutters="false" style="width: 100%; height: 100%; margin: 0;">
+    <div id="map" dojotype="dijit/layout/ContentPane" region="center" style="overflow:hidden;position:relative;">
+      <div id="map_draw_status" class="collapse">
+        <div data-dojo-type="dijit/ProgressBar" data-dojo-props='indeterminate:"true", label: "loading...", style:"width:100px"'></div>
+      </div>
+      <div id="searchWindow"><div id="search"></div></div>
+      <div id="floatingWindow">
+        <div class="shadow">
+          <div id="title">
+            <!--<h4>Change Detection</h4>-->
+            <span>The city of Dubai underwent drastic expansion at the beginning of the 21st century. The pre-post development difference in satellite images exhibits an ideal <b>bimodal histogram distribution</b>. This application utilizes two scenes from the Esri Landsat GLS service and leverages server side <b>Otsu's thresholding</b> method to <b>detect change</b> and highlight the newly developed area.</span>
+          </div>
+          <div id="divbasicFeatures">
+
+
+            <button data-dojo-type="dijit/form/Button" data-dojo-id="analysis" onclick="showImage(25859);" type="button">2000</button>
+
+            <button data-dojo-type="dijit/form/Button" data-dojo-id="analysis" onclick="showImage(16116);" type="button">2006</button>
+
+            <button data-dojo-type="dijit/form/Button" data-dojo-id="analysis" onclick="showChange();" type="button">change</button>
+            <br />
+            <button data-dojo-type="dijit/form/Button" data-dojo-id="analysis" onclick="showImage();" type="button">explore the entire world</button>
+
+            <div>
+              <label id="transparencyLabel">
+                Transparency:0
+              </label>
+              <div id="transparencySlider" dojotype="dijit/form/HorizontalSlider" onmousemove="changeTransparency(this.value);" onchange="changeTransparency(this.value);" onclick="changeTransparency(this.value);" value="0" maximum="100" minimum="0" pageincrement="1" showbuttons="true" intermediatechanges="true" slideduration="500">
+                <div data-dojo-type="dijit/form/HorizontalRule" data-dojo-props='container:"bottomDecoration", count:5, style:{height:"5px"}'></div>
+                <ol data-dojo-type="dijit/form/HorizontalRuleLabels" data-dojo-props='container:"bottomDecoration", style:{height:"1em",fontSize:"90%"}'>
+                  <li>0</li>
+                  <li>100</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,378 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no">
+  <title>Wind data</title>
+  <link rel="stylesheet" href="//js.arcgis.com/3.16/dijit/themes/claro/claro.css">
+  <link rel="stylesheet" href="//js.arcgis.com/3.16/esri/css/esri.css">
+  <style>
+    #info {
+      top: 20px;
+      color: #444;
+      height: auto;
+      font-family: arial;
+      right: 20px;
+      margin: 5px;
+      padding: 10px;
+      position: absolute;
+      width: 115px;
+      z-index: 40;
+      border: solid 2px #666;
+      border-radius: 4px;
+      background-color: #fff;
+    }
+
+
+    html, body {
+      width: 98%;
+      height: 98%;
+      margin: 0 1%;
+      padding: 10px 0 0 0;
+    }
+
+    #bottomPanel {
+      /*font-family: arial;
+            color: #444;*/
+      left: 5%;
+      margin: 0 auto;
+      /*margin-left: -500px;*/
+      position: absolute;
+      bottom: 2.5em;
+    }
+
+    #map {
+      border: solid 1px #888;
+      padding: 0;
+    }
+
+    #status {
+      background-color: #000;
+      color: #FFF;
+      border: solid 1px #FFF;
+      -moz-border-radius: 5px;
+      -webkit-border-radius: 5px;
+      border-radius: 5px;
+      padding: 3px;
+    }
+
+    #footer {
+      height: 80px;
+      padding: 10px;
+    }
+  </style>
+  <link rel="stylesheet" href="//js.arcgis.com/3.16/dijit/themes/tundra/tundra.css">
+
+  <script type="text/javascript">
+    var dojoConfig = {
+      parseOnLoad: false,
+      async: true,
+      isDebug: true,
+      packages: [
+          {
+            name: "windrose",
+            location: location.pathname.replace(/\/[^/]+$/, '').concat('/js')
+          }
+      ]
+    };
+  </script>
+  <script type="text/javascript" src="http://js.arcgis.com/3.16/"></script>
+  <script>
+    var map, tb;
+    var isVectorLayer, symbolTileSize;
+    var sliderMin, sliderMax, currentMin, currentMax, chart1, legend1;
+    var currentLocation, ids, chunkSize = 20, chunkId = 0, pixelValues = [], readyToDraw = false;
+    require([
+      "esri/map",
+      "esri/graphic", "esri/request",
+      "esri/symbols/SimpleLineSymbol", "esri/symbols/SimpleFillSymbol",
+      "esri/domUtils", "dojo/_base/array", "dijit/registry", "dojo/_base/url", "dojo/has", "dojo/on","dojo/DeferredList",
+      "esri/Color", "esri/arcgis/utils", "esri/InfoTemplate", "esri/tasks/query",
+      "esri/layers/ArcGISImageServiceVectorLayer", "esri/renderers/VectorFieldRenderer", "esri/layers/ImageServiceParameters","esri/layers/GraphicsLayer","esri/symbols/SimpleMarkerSymbol",
+      "esri/layers/RasterFunction", "esri/layers/pixelFilters/VectorFieldPixelFilter", "esri/layers/MosaicRule", "esri/layers/DimensionalDefinition",
+      "esri/geometry/Extent", "esri/SpatialReference",
+      "dijit/layout/BorderContainer", "dijit/layout/ContentPane", "dijit/Dialog",
+      "dojox/charting/Chart", "windrose/LegendExt", "windrose/Rose",   "dojox/charting/action2d/Tooltip",
+      "dojox/charting/themes/PlotKit/blue",   "windrose/green12",   "dojox/charting/themes/PlotKit/red",   "dojox/charting/themes/Adobebricks",   "dojox/charting/themes/Algae","dijit/ProgressBar",
+      "esri/dijit/TimeSlider","esri/TimeExtent",
+      "dojo/parser", "dojo/dom", "dojo/dom-construct","dojo/on", "dojo/domReady!"
+    ], function (
+      Map,
+      Graphic, esriRequest, SimpleLineSymbol, SimpleFillSymbol,
+      domUtils, array, registry, Url, has, on, DeferredList,
+      Color, arcgisUtils, InfoTemplate, Query,
+      ArcGISImageServiceVectorLayer, VectorFieldRenderer, ImageServiceParameters,GraphicsLayer,SimpleMarkerSymbol,
+      RasterFunction, VectorFieldPixelFilter, MosaicRule, DimensionalDefinition,
+      Extent, SpatialReference,
+      BorderContainer, ContentPane, Dialog,
+      Chart, LegendExt, Rose, Tooltip, ThemeBlue, ThemeGreen12, ThemeRed, Adobebricks, Algae,ProgressBar,TimeSlider,TimeExtent,
+      parser, dom, domconstruct, on) {
+      parser.parse();
+      myDialog.show();
+      var isUrl = "http://sampleserver6.arcgisonline.com/arcgis/rest/services/ScientificData/NDFD_wind/ImageServer";      
+      var corsEnabledServers, imageServiceAuthority, onceDone;
+      imageServiceAuthority = new Url(isUrl).authority;
+      corsEnabledServers = esriConfig.defaults.io.corsEnabledServers;
+      if (!corsEnabledServers.some(function (x) {
+        return x === imageServiceAuthority;
+      })) {
+        corsEnabledServers.push(imageServiceAuthority);
+      }
+
+      // var dataExtent = new Extent(-9588260.828089952, -4914613.913406536, 9588260.828089952, 5299819.050395412, new SpatialReference(3857));
+      var dataExtent = new Extent(-12749985.783490926,4141380.663166877,-10497233.685870811,5288547.583670496, new SpatialReference(3857));
+      map = new Map("map", {
+        basemap: "gray",
+        extent: dataExtent
+        //zoom: 5
+      });
+
+      map.on("update-start", function () {
+        //do something
+      });
+      map.on("update-end", function () {
+        //do something
+      });
+
+      // use MosaicRule to define which slice to display
+      var mr = new MosaicRule();
+      mr.multidimensionalDefinition = [];
+      mr.multidimensionalDefinition.push(new DimensionalDefinition({
+        variableName: "Vector-MagDir",
+        dimensionName: "StdTime",
+        values: [1414303200000],
+
+      }));
+
+      var params = new ImageServiceParameters();
+      //params.mosaicRule = mr;
+
+      isVectorLayer = new ArcGISImageServiceVectorLayer(isUrl, {
+        rendererStyle: VectorFieldRenderer.STYLE_SINGLE_ARROW,  //STYLE_CLASSIFIED_ARROW
+        symbolTileSize: 50,
+        imageServiceParameters: params
+      });
+
+      var sizeInfoVar = {
+        type: "sizeInfo",
+        minSize: 2,
+        maxSize: 35,
+        minDataValue: 0.5,
+        maxDataValue: 10
+      };
+
+      var visualVariables = [];
+      visualVariables.push(sizeInfoVar);
+
+      var renderer = new VectorFieldRenderer({
+        style: VectorFieldRenderer.STYLE_BEAUFORT_KN,
+        visualVariables: visualVariables,
+        flowRepresentation: VectorFieldRenderer.FLOW_FROM
+      });
+
+      isVectorLayer.setRenderer(renderer);
+
+      isVectorLayer.on("load", function (args) {
+        //the maxMosaicImagecount is a contraint for image service getSamples API too.
+        chunkSize = isVectorLayer.maxMosaicImageCount;        
+      });
+
+      map.addLayer(isVectorLayer);
+      var markerSymbol = new SimpleMarkerSymbol();
+      markerSymbol.setPath("M16,4.938c-7.732,0-14,4.701-14,10.5c0,1.981,0.741,3.833,2.016,5.414L2,25.272l5.613-1.44c2.339,1.316,5.237,2.106,8.387,2.106c7.732,0,14-4.701,14-10.5S23.732,4.938,16,4.938zM16.868,21.375h-1.969v-1.889h1.969V21.375zM16.772,18.094h-1.777l-0.176-8.083h2.113L16.772,18.094z");
+      markerSymbol.setColor(new Color("#00FFFF"));
+      var myProgressBar = registry.byId("samplingProgress");
+      var divProgress = dom.byId("divProgress");
+
+
+      on(map, "click", function (x) {
+        map.graphics.clear();
+        currentLocation = x.mapPoint;
+        map.graphics.add(new Graphic(currentLocation,markerSymbol));
+        myProgressBar.set({ label: "Fetching data: 0%" });
+        myProgressBar.set({ value: 0});
+        domUtils.show(divProgress);
+        chunkId = 0;
+        pixelValues = [];
+        readyToDraw = true;
+        domUtils.hide(dom.byId("status"));
+        var query = esriRequest({
+          url: isUrl + "/query",
+          content: { geometry: JSON.stringify(currentLocation.toJson()), geometryType: "esriGeometryPoint", returnGeometry: false, returnIdsOnly: true, f: "json" },
+          handleAs: "json",
+          callbackParamName: "callback"
+        });
+
+        query.then(getRasterIds, errorbackfunc);
+      });
+
+      initSlider();
+      function initSlider() {
+        domUtils.show(dom.byId("bottomPanel"));
+        var timeSlider = new TimeSlider({
+          style: "width: 100%;"
+        }, dom.byId("timeSliderDiv"));
+        map.setTimeSlider(timeSlider);
+
+        var timeExtent = new TimeExtent();
+        timeExtent.startTime = new Date("10/26/2014 6:00 UTC");
+        timeExtent.endTime = new Date("10/30/2014 12:00 UTC");
+        timeSlider.setThumbCount(2);
+        timeSlider.createTimeStopsByTimeInterval(timeExtent, 3, "esriTimeUnitsHours");
+        timeSlider.setThumbIndexes([0,1]);
+        timeSlider._createTimeInstants = true;
+        timeSlider.setThumbMovingRate(2000);
+        timeSlider.startup();
+
+        //add labels for every other time stop
+        var labels = ["2015/1/1","2015/12/31"];
+
+        timeSlider.setLabels(labels);
+
+        timeSlider.on("time-extent-change", function(evt) {
+          var startValString = evt.startTime.getUTCFullYear() + "/"+(evt.startTime.getMonth()+1) +"/"+evt.startTime.getDate();
+          //var endValString = evt.endTime.getUTCFullYear();
+          dom.byId("daterange").innerHTML ="<p>Wind data:"+ startValString + "<\/p>";//+ " and " + endValString  + "<\/i>";
+        });
+      }
+
+      function getRasterIds(response){
+        ids = response.objectIds;
+        total = ids.length;
+        //use two concurrent requests
+        identifyRasters();
+
+        if (chunkSize<ids.length){
+          chunkId++;
+          identifyRasters();
+        }
+      }
+
+      function identifyRasters(){
+        var mr = new MosaicRule();
+        mr.mosaicMethod = "esriMosaicNone";
+        var start = chunkId*chunkSize;
+        var end = Math.min(start+chunkSize,ids.length-1);
+        mr.method = MosaicRule.METHOD_NONE;
+        mr.objectIds = ids.slice(start, end);
+        if (end !== ids.length){
+          chunkId++;
+        }
+        if (chunkId === 15){
+          console.log("15");
+        }
+        var identifyRequest = esriRequest({
+          url: isUrl + "/getSamples",//identify
+          content: { geometry: JSON.stringify(currentLocation.toJson()), geometryType: "esriGeometryPoint", returnGeometry: false, returnFirstValueOnly: false, returnCatalogItems: true, mosaicRule: JSON.stringify(mr.toJson()), f: "json" },
+          handleAs: "json",
+          callbackParamName: "callback"
+        });
+        identifyRequest.then(drawChart, errorbackfunc);
+      }
+
+
+      function drawChart(response) {
+        var progress = (chunkId +1) * chunkSize;
+        pixelValues = pixelValues.concat(response.samples.map(x=>x.value));
+        var progressPercent = Math.min(Math.round(progress / ids.length* 100),100);
+        myProgressBar.set({ label: "Fetching data: "+progressPercent+"%" });
+        myProgressBar.set({ value: progressPercent});
+
+        if (progress<ids.length){
+          identifyRasters();
+          return;
+        }
+
+        //only draw it once
+        if (!readyToDraw){
+          return;
+        }
+        readyToDraw = false;
+
+        var data = [], i, vec;
+        //test data
+        //values = ["2.89353 -80.0494","3.26669 125.028","5.31331 118.374","9.93972 152.919","10.6391 16.5187","1.75 5.00067e-005","11.1028 152.8","12.3789 115.478","13.3896 119.533","5.70931 96.2848","12.1353 61.8511","8.85738 45.8005","4.83736 82.875","10.1658 59.3987","15.93 38.3087","4.85914 74.1761","9.07662 162.364","11.1581 153.665","9.91441 118.956","8.86232 71.4117","14.8797 88.5559","16.0179 40.2521","12.5465 35.0201","13.3369 24.3551","17.8642 23.1565","14.8 18.9246","19.4008 -0.516825","6.5552 78.5615","12.1055 17.4246","11.2014 0.895177","14.2584 3.921","13.4233 9.21673","7.14187 -7.84646","2.38144 243.166","4.82001 233.011","11.2207 201.707","11.6295 185.551","11.2412 155.145","3.76065 144.197","5.775 180","5.07721 181.693","7.33676 203.07","9.87041 53.6525","4.45933 99.3567","11.1288 55.9887","5.45711 103.782","11.2117 149.146","6.81162 22.8949","8.25379 51.3944","2.79576 102.918","3.65282 101.848","7.12377 160.738","5.29085 127.899","6.50173 91.322","8.88654 20.9334","5.38354 6.39897","3.61291 145.43","8.11946 166.648","12.5798 162.537","7.4181 138.142","8.86975 66.759","11.183 35.5377","6.12337 67.938","3.45561 52.0523","6.38054 40.8691","6.34439 -11.1328","1.32311 112.203","12.8374 34.928","4.57507 0.313098","9.9914 189.651","11.814 182.79","8.73756 158.868","8.49827 167.599","4.454 106.299","3.4613 125.297","4.78657 22.4127","5.65912 25.0933","1.39933 198.759","10.7686 193.972","6.61556 165.334","3.32133 70.2011","3.13249 65.4804","12.1149 19.7811","14.7026 1.07174","9.32554 -0.614406","7.32888 5.08827","3.16672 42.7605","8.20495 164.99","12.6143 182.726","13.6679 177.064","7.68542 182.983","1.93472 154.759","2.50325 8.61566","4.22507 180.339","15.0255 179.523","14.714 190.871","9.85609 186.115","5.55051 180.774","5.34936 29.0806","2.05503 99.806","10.11 177.449","11.054 175.85","6.46471 151.849","5.87729 158.018","3.85049 31.7294","6.66394 75.4424","9.59118 21.8846","4.86891 140.835","16.4755 185.486","14.9679 187.196","11.5522 178.884","11.7846 182.31","13.4708 187.679","14.1 180.102","13.9275 183.602","10.0829 182.274","7.17692 145.646","7.20733 177.415","7.20503 158.42","6.6577 165.651","5.50239 129.839","4.01474 117.842","4.7419 94.8389","7.29006 53.3659","10.6661 13.4174","3.46636 11.2289","4.82733 1.78066","0.724999 180","5.85342 178.042","8.60654 189.025","10.1509 184.096","14.2622 186.34","10.851 180.792","9.87503 180.145","7.80016 180.367","13.2024 181.085","16.1093 183.737","12.9934 188.52","8.36335 174.511","0.480884 152.103","1.86581 252.051","3.91184 215.112","2.34014 198.048","2.84089 96.0618","3.01507 15.8802","3.78096 125.582","11.5289 181.491","9.83648 182.768","8.8 180","9.70889 188.589","5.9785 194.036","5.89814 209.173","9.44937 199.633","10.165 188.628","11.9328 187.706","15.3069 191.493","13.2409 192.541","8.09915 184.426","5.35735 151.88","4.54099 141.931","2.03255 148.069","4.05725 145.037","12.402 181.04","10.0503 179.572","3.69121 151.699","1.73385 185.793","14.6145 182.549","16.7626 182.222","12.0843 182.253","10.5051 174.127","7.85255 178.541","3.18561 8.57526","6.02292 -5.00064","5.91951 24.1836","4.36985 32.1444","3.09607 137.291","3.98262 170.242","2.14389 31.6513","4.70538 2.74081","6.456 163.811","11.9009 174.697","12.5762 180.797","12.5859 175.671","14.8554 176.333","7.05359 171.439","0.750001 36.8699","2.0573 244.058","10.1413 183.25","13.5004 179.576","5.63122 150.476","2.05198 112.19","2.04969 149.995","1.72192 154.179","9.7458 167.105","8.83759 186.823","2.78051 123.261","6.28351 153.027","9.36082 177.245","10.025 174.275","12.2838 167.661","14.2571 178.191","16.0937 182.76","16.7994 186.237","13.0561 183.953","13.3326 178.066","14.0904 187.339","14.9271 180.96","14.4977 185.74","15.3784 178.789","13.1028 174.855","10.2013 170.976","4.96236 139.086","4.88275 93.2286","2.057 -73.7676","5.20216 197.912","7.19835 188.186","8.37929 172.112","8.45843 170.816","8.57795 178.497","9.42662 178.936","10.2104 175.225","9.59538 176.265","8.08061 160.668","8.26022 159.261","9.33906 162.875","9.33384 170.285","6.99866 156.64","7.55596 165.044","6.57619 181.089","6.37377 154.44","7.71508 172.553","4.53356 203.738","2.34121 120.124","4.17507 142.787","9.99381 162.381","8.21466 162.282","7.28397 158.454","12.4153 175.38","13.3791 171.295","10.1258 155.65","6.46964 129.04","7.32069 156.236","13.3853 177.752","15.3 180","14.7049 172.38","10.3287 178.474","4.71699 147.995","5.31801 97.2921","1.71483 45.5906","6.02422 18.1342","2.00125 102.995","4.41199 94.2244","6.59777 136.996","15.4013 179.256","12.3573 172.444","13.4695 176.915","15.9501 180.18","13.85 180.103","12.3549 170.919","10.749 192.355","5.52551 180.778","8.60919 134.647","4.7363 79.0459","4.65027 163.124","4.20476 92.7263","5.17071 17.7341","4.21878 -24.1348","3.36619 152.103","3.24692 170.248","6.61556 30.9266","3.92978 72.6025","3.1286 92.7481","5.01423 106.809","6.38401 163.623","5.02699 146.152","5.96055 96.2606","4.10868 48.4533","4.31748 67.8905","5.05748 93.117","3.25 53.1301","2.78265 8.78533","8.64093 18.3825","5.44472 45","8.98088 45.6767","7.71525 25.7347","9.05956 40.6356","11.4107 12.2701","3.36006 36.5289","2.37973 109.006","4.05286 42.2499","1.30504 196.699","5.22554 36.0475","10.7081 14.3282","0.996241 -72.4744","7.25603 7.12503","13.4034 -1.28252","2.98171 236.976","8.09695 170.043","8.80429 178.21","6.29484 173.157","1.79025 -35.9097","6.20423 203.259","10.5721 190.353","12.0686 175.128","14.0628 169.449","12.6921 189.982","11.1208 167.932","10.6956 126.254","6.78279 140.384","9.63331 182.38","7.60349 194.082","11.2468 213.302","12.9596 214.15","9.27928 195.309","7.93461 202.606","5.17669 174.179","4.45211 79.3211","1.32004 232.696","8.19012 200.924","12.7124 212.471","6.255 182.291","3.0105 24.0108","8.90962 -7.90274","6.53041 -18.9898","5.285 36.9241","12.8116 37.7867","14.1408 -21.5757","14.4743 14.7083","18.1053 6.18293","19.5454 -7.57043","9.12092 -10.2627","4.34123 4.95547","6.94141 30.9991","4.29535 65.2249","8.38041 197.894","7.85828 170.478","2.69455 152.959","2.96184 -68.1986","2.10431 43.5559","4.63256 24.2137","1.55724 185.527","3.05502 36.6824","7.84761 12.8852","3.83968 12.4074","2.89795 190.437","5.47066 195.37","2.48244 124.33","14.8739 35.5601","12.4162 9.38646","3.53713 43.2816","15.0709 -4.4716","3.98003 -56.0105","0.412309 165.964","5.73591 62.7648","2.54608 70.4975","5.74739 152.543","3.08586 26.9802","5.3668 -21.3058","4.8431 -49.8157","6.30526 -11.6663","10.2814 8.24832","7.38432 24.3958","4.14947 173.774","8.70761 186.595","12.0951 186.17"];
+        for (i = 0; i < pixelValues.length; i++) {
+          vec = pixelValues[i].replace(","," ").split(" ").map(x=>parseInt(x));
+          if (!isNaN(vec[0]) && !isNaN(vec[1]) )
+            data.push(vec);
+        }
+        domUtils.hide(divProgress);
+        domUtils.show(dom.byId("status"));
+        if (!chart1){
+          chart1 = new dojox.charting.Chart("test1");
+          chart1.setTheme(ThemeGreen12);
+          chart1.addPlot("default", {
+            type: "Rose",
+            font: "normal normal bold 12pt Tahoma",
+            fontColor: "white",
+            labelOffset: 20,
+            radius: 100
+          });
+
+          chart1.addSeries("Series A", data);
+          var anim_c = new dojox.charting.action2d.Tooltip(chart1, "default");
+          domUtils.show(dom.byId("status"));
+          chart1.render();
+
+          legend1 = new dojox.charting.widget.LegendExt({
+            chart: chart1,
+            horizontal: false
+          }, "legend");
+        }
+        else {
+          chart1.updateSeries("Series A", data);
+          chart1.render();
+          legend1.refresh();
+        }
+      }
+      function errorbackfunc(err) {
+        //alert(err);
+        //simply skip to the next chunk.
+        var progress = (chunkId +1) * chunkSize;
+        if (progress<ids.length){
+          identifyRasters();
+          return;
+        }
+      }
+
+
+    });
+  </script>
+</head>
+
+<body class="claro">
+  <div data-dojo-type="dijit/layout/BorderContainer" data-dojo-props="design:'headline', gutters:false"
+       style="width: 100%; height: 100%; margin: 0;">
+    <div id="map" class='shadow' data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region:'center'"
+         style="height: 100%;">
+      <div data-dojo-type="dijit/Dialog" data-dojo-id="myDialog" title="Wind data visualization" style="position: absolute; left: 40%; width: 400px; display:none; z-index: 999; background-color:aliceblue;">
+        <label>Click any location on the map to vsiualize the statistics of frequency, magnitude (Beaufort), and directions</label>
+        <div class="dijitDialogPaneActionBar">
+          <button data-dojo-type="dijit/form/Button" type="submit" id="ok">Got it!</button>
+        </div>
+      </div>
+
+      <div id="status" style="position: absolute; right: 10px; width: 300px; bottom: 10%; z-index: 99; display:none">
+        <p>Wind Rose</p>
+        <div id="test1" style="width: 300px; height: 300px;"></div>
+        <div id="legend"></div>
+      </div>
+      <label id="lblProgress"></label>
+      <div id="divProgress" style="position: absolute; left: 40%; width: 400px; bottom: 50%; z-index: 99; display:none; background-color:bisque">
+        <div class="tundra" data-dojo-type="dijit/ProgressBar"
+             data-dojo-id="myProgressBar" id="samplingProgress" data-dojo-props="maximum:100"></div>
+      </div>
+      <div id="bottomPanel" style="display:none">
+        <div>
+          <div id="daterange" style="position: absolute; left: 50%; top:-25px;width: 300px; z-index: 99;">
+            <p>Wind data: 2014/10/26</p>
+          </div>
+          <div id="timeSliderDiv"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>

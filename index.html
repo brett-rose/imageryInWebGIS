@@ -1,0 +1,378 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+  <meta name="description" content="">
+  <meta name="author" content="">
+  <link rel="icon" href="../../favicon.ico">
+  <title>Image Service Sample Apps</title>
+  <!-- Bootstrap core CSS -->
+  <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Custom styles for this template -->
+  <link href="index.css" rel="stylesheet">
+</head>
+<!-- NAVBAR
+================================================== -->
+<body>
+  <div class="navbar-wrapper">
+    <div class="container">
+      <b class="soloHeader">Image Service Sample Apps</b>
+      <nav class="navbar navbar-static-top">
+        <div class="container">
+          <div class="navbar-header">
+            <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+              <span class="sr-only">Toggle navigation</span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+            </button>
+            <h3><strong></strong></h3>
+          </div>
+          <div id="navbar" class="navbar-collapse collapse">
+            <ul class="nav navbar-nav">
+              <!--<li class="active"><a href="#">Home</a></li>
+              <li><a href="#about">About</a></li>
+              <li><a href="#contact">Contact</a></li>
+              <li class="dropdown">
+                <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Dropdown <span class="caret"></span></a>
+                <ul class="dropdown-menu">
+                  <li><a href="#">Action</a></li>
+                  <li><a href="#">Another action</a></li>
+                  <li><a href="#">Something else here</a></li>
+                  <li role="separator" class="divider"></li>
+                  <li class="dropdown-header">Nav header</li>
+                  <li><a href="#">Separated link</a></li>
+                  <li><a href="#">One more separated link</a></li>
+                </ul>
+              </li> -->
+            </ul>
+          </div>
+        </div>
+      </nav>
+    </div>
+  </div>
+
+  <!-- Carousel
+  ================================================== -->
+  <div id="myCarousel" class="carousel slide" data-ride="carousel">
+    <!-- Indicators -->
+    <ol class="carousel-indicators">
+      <li data-target="#myCarousel" data-slide-to="0" class="active"></li>
+      <li data-target="#myCarousel" data-slide-to="1"></li>
+      <li data-target="#myCarousel" data-slide-to="2"></li>
+      <li data-target="#myCarousel" data-slide-to="3"></li>
+      <li data-target="#myCarousel" data-slide-to="4"></li>
+      <li data-target="#myCarousel" data-slide-to="5"></li>
+      <li data-target="#myCarousel" data-slide-to="6"></li>
+      <li data-target="#myCarousel" data-slide-to="7"></li>
+      <li data-target="#myCarousel" data-slide-to="8"></li>
+      <li data-target="#myCarousel" data-slide-to="9"></li>
+    </ol>
+    <div class="carousel-inner" role="listbox">
+      <div class="item active">
+        <img class="first-slide" src="img\wind.png" alt="First slide">
+        <div class="container">
+          <div class="carousel-caption">
+            <h1>Wind Data Visualization</h1>
+            <p>Wind force visualization, animation, and wind rose plotting. 365 days data of 2015.</p>
+            <p><a class="btn btn-lg btn-primary" href="./windrose" target='_blank' role="button">Demo</a></p>
+          </div>
+        </div>
+      </div>
+      <div class="item">
+        <img class="second-slide" src="img\land.png" alt="Second slide">
+        <div class="container">
+          <div class="carousel-caption">
+            <h1>NLCD Exploration</h1>
+            <p>Interactive Land cover charting. Derive land cover composition in a 5 mile radius instanteneously.</p>
+            <p><a class="btn btn-lg btn-primary" href="./rasterLayerPixelChart.html" target='_blank' role="button">Demo</a></p>
+          </div>
+        </div>
+      </div>
+      <div class="item">
+        <img class="third-slide" src="img\scatter.png" alt="Third slide">
+        <div class="container">
+          <div class="carousel-caption">
+            <h1>Scatter Plot.</h1>
+            <p>Scatter plot, display pixel values (of two color channels) in a 2 dimensional space. Interactions with the map: live update to scatter plot on image change; and reflect highlights on map by drawing on the scatter plot canvas.</p>
+            <p><a class="btn btn-lg btn-primary" href="./scatterplotdemo" target='_blank' role="button">Demo</a></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <img class="third-slide" src="img\viewshed.png" alt="4th slide">
+        <div class="container">
+          <div class="carousel-caption">
+            <h1>WebGL: Viewshed analysis</h1>
+            <p>Interactive viewshed analysis in current AOI.</p>
+            <p><a class="btn btn-lg btn-primary" href="./viewshed" target='_blank' role="button">Demo</a></p>
+          </div>
+        </div>
+      </div>      
+
+      <div class="item">
+        <img class="third-slide" src="img\gldas.png" alt="5th slide">
+        <div class="container">
+          <div class="carousel-caption">
+            <h1>Profiling Multidimensioal Data</h1>
+            <p>Exploring GLDAS services with multidimensional profiles</p>
+            <p><a class="btn btn-lg btn-primary" href="./DimensionalProfileApp/Index_RainSnow.html" target='_blank' role="button">Demo</a></p>
+          </div>
+        </div>
+      </div>
+      
+
+      <div class="item">
+        <img class="third-slide" src="img\oblique.png" alt="6th slide">
+        <div class="container">
+          <div class="carousel-caption">
+            <h1>Web App Builder: Oblique Viewer Widget</h1>
+            <p>Top-up view of oblique images with height measurement tools</p>
+            <p><a class="btn btn-lg btn-primary" href="//www.arcgis.com/apps/webappviewer/index.html?id=32fbc8e21c50414f8d007c7c318b5a7e" target='_blank' role="button">Demo</a></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <img class="third-slide" src="img\dubai.png" alt="7th slide">
+        <div class="container">
+          <div class="carousel-caption">
+            <h1>Server side processing: Change detection</h1>
+            <p>When the difference image contains big changes that form a bimodal histogram, <b>Otsu's method</b> is a perfect choice to automatically detect these changes.</p>
+            <p><a class="btn btn-lg btn-primary" href="./isdubai.html" target='_blank' role="button">Demo</a></p>
+          </div>
+        </div>
+      </div>
+
+
+      <div class="item">
+        <img class="third-slide" src="img\avalanche.png" alt="8th slide">
+        <div class="container">
+          <div class="carousel-caption">
+            <h1>Server side processing: avalanche analysis</h1>
+            <p>Shows avalanche risks using a naive model with user defined elevation, slope, aspect criteria. Processed on server side.</p>
+            <p><a class="btn btn-lg btn-primary" href="./isavalanche.html" target='_blank' role="button">Demo</a></p>
+          </div>
+        </div>
+      </div>
+
+
+      <div class="item">
+        <img class="third-slide" src="img\classification.png" alt="9th slide">
+        <div class="container">
+          <div class="carousel-caption">
+            <h1>Server side processing: Classification</h1>
+            <p>Performs training sample selection and maximum likelihood classification on server side. Using on the fly raster function approach.</p>
+            <p><a class="btn btn-lg btn-primary" href="./clssimple" target='_blank' role="button">Demo</a></p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="item">
+        <img class="third-slide" src="img\3DImagery.png" alt="10th slide">
+        <div class="container">
+          <div class="carousel-caption">
+            <h1>Ocean temperature data from HYbrid Coordinate Ocean Model</h1>
+            <p>3D visualization of an image service</p>
+            <p><a class="btn btn-lg btn-primary" href="./3D" target='_blank' role="button">Demo</a></p>
+          </div>
+        </div>
+      </div>       
+
+    </div>
+    <a class="left carousel-control" href="#myCarousel" role="button" data-slide="prev">
+      <span class="glyphicon glyphicon-chevron-left" aria-hidden="true"></span>
+      <span class="sr-only">Previous</span>
+    </a>
+    <a class="right carousel-control" href="#myCarousel" role="button" data-slide="next">
+      <span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span>
+      <span class="sr-only">Next</span>
+    </a>
+  </div><!-- /.carousel -->
+  <!-- Marketing messaging and featurettes
+  ================================================== -->
+  <!-- Wrap the rest of the page in another container to center all the content. -->
+  <div class="container marketing">
+    <!-- Three columns of text below the carousel -->
+    <div class="row">
+      <div class="col-lg-4">
+        <img class="img-circle" src="img/bigData.png" alt="Big Data" width="140" height="140">
+        <h2>Big Data</h2>
+        <p>As of June 20th, 2016, Esri Landsat Services provide web access to more than 500 TB data. It keeps growing.</p>
+        <p><a class="btn btn-default" href="//www.esri.com/landing-pages/software/landsat/unlock-earths-secrets" role="button">View details &raquo;</a></p>
+      </div><!-- /.col-lg-4 -->
+      <div class="col-lg-4">
+        <img class="img-circle" src="img/function.png" alt="Cutting Edge Technology" width="140" height="140">
+        <h2>Cutting Edge Technology</h2>
+        <p>ArcGIS Server image extension provides instaneous access to raster data processing and rendering algorithms through REST APIs. Available to Javascript, Runtime developers.</p>
+        <p><a class="btn btn-default" href="http://resources.arcgis.com/en/help/arcgis-rest-api/#/Raster_function_objects/02r3000000rv000000/" role="button">View details &raquo;</a></p>
+      </div><!-- /.col-lg-4 -->
+      <div class="col-lg-4">
+        <img class="img-circle" src="img/analytics.png" alt="Raster Analytics" width="140" height="140">
+        <h2>Raster Analytics</h2>
+        <p>Process your data using a cluster of machines, Persist the results in cloud-ready formats, drastically improve processing time and result availabilty. Stay tuned @ArcGIS10.5.</p>
+        <p><a class="btn btn-default disabled" href="" role="button">View details &raquo;</a></p>
+      </div><!-- /.col-lg-4 -->
+    </div><!-- /.row -->
+    <!-- START THE FEATURETTES -->
+
+
+    <hr class="featurette-divider">
+    <div class="row">
+      <div class="col-md-3">
+        <h5 class="featurette-heading">Image Service 101<span class="text-muted"></span></h5>
+        <p class="lead">Using tiled image service, dynamic image service, imagery webmaps and widgets.</p>
+        <ul>
+          <li>
+            left: tiled and dynamic image access.
+          </li>
+          <li>
+            right: using webmap and widgets in custom JS app.
+          </li>
+        </ul>
+      </div>
+      <div class="col-md-9">
+        <a href="./issimple.html" target="_blank"><img data-toggle="tooltip" title="tiled and dynamic image access" alt="windrose" src="img\simple.png" class="img-snapshot" /></a>
+        <a href="./iswebmap.html" target="_blank"><img data-toggle="tooltip" title="using webmap and widgets in custom JS app" alt="scatterplot" src="img\webmap.png" class="img-snapshot" /></a>
+      </div>
+    </div>
+
+
+    <hr class="featurette-divider">
+    <div class="row featurette">
+      <div class="col-md-4 col-md-push-8">
+        <h2 class="featurette-heading">Client Side Pixel Filter<span class="text-muted"></span></h2>
+        <p class="lead">Web apps now have full access to real raster data, not just rendered pictures!</p>
+        <ul>
+          <li>
+            left: sea temperature using NDFD
+          </li>
+          <!--<li>
+          middle: filter flood levels using elevation data
+        </li>-->
+          <li>
+            right: webgl viewshed analysis
+          </li>
+        </ul>
+      </div>
+      <div class="col-md-8 col-md-pull-4">
+        <a href="./rasterlayerTemperatureFilter.html" target="_blank"><img data-toggle="tooltip" title="Sea temperature filtering" alt="sea temperature filtering" src="img\temperature.png" class="img-snapshot" /></a>
+        <a href="./viewshed" target="_blank"><img data-toggle="tooltip" title="viewshed" alt="webgl_viewshed" src="img\viewshed.png" class="img-snapshot" /></a>
+      </div>
+    </div>
+
+
+
+    <hr class="featurette-divider">
+    <div class="row">
+      <div class="col-md-3">
+        <h5 class="featurette-heading">Server side processing<span class="text-muted"></span></h5>
+        <p class="lead">Most common image processing algorithms can be easily accessed through ArcGIS Javascript/REST API</p>
+        <ul>
+          <li>
+            left: Change detection using Otsu's thresholding method.
+          </li>
+          <li>
+            right: ArcGISImageServiceLayer with server side processing; client defines avalanche model using a series of raster functions. (Server Functions)
+          </li>
+        </ul>
+      </div>
+      <div class="col-md-9">
+        <!--<a href="./isflood.html" target="_blank"><img data-toggle="tooltip" title="Flood risk analysis" alt="Interactive pixel filtering" src="img\flood.png" class="img-snapshot" /></a>-->
+        <a href="./isdubai.html" target="_blank"><img data-toggle="tooltip" title="Change detection with Otsu's thresholding method" alt="Interactive pixel filtering" src="img\dubai.png" class="img-snapshot" /></a>
+        <a href="./isavalanche.html" target="_blank"><img data-toggle="tooltip" title="Avalanche risk analysis" alt="webgl_hillshade" src="img\avalanche.png" class="img-snapshot" /></a>
+      </div>
+    </div>
+
+    <hr class="featurette-divider">
+    <div class="row">
+      <div class="col-md-3 col-md-push-9">
+        <h5 class="featurette-heading">Charting pixels<span class="text-muted"></span></h5>
+        <p class="lead">Fetch raw raster data using exportImage/lerc or getSamples API, and do the charting in your apps!</p>
+        <ul>
+          <li>
+            left: Wind force visualization, animation, and wind rose plotting. 365 days data of 2015.
+          </li>
+          <li>
+            right: Interactive Land cover charting. Derive land cover composition in a 5 mile radius instanteneously.
+          </li>
+          <li>
+            left: Scatter plot, display pixel values (of two color channels) in a 2 dimensional space. Interactions with the map: live update to scatter plot on image change; and reflect highlights on map by drawing on the scatter plot canvas.
+          </li>
+          <li>
+            right: dimensional profiles of rain and snow
+          </li>
+        </ul>
+      </div>
+      <div class="col-md-9 col-md-pull-3">
+        <a href="./windrose" target="_blank"><img data-toggle="tooltip" title="wind force visualization" alt="windrose" src="img\wind.png" class="img-snapshot" /></a>
+        <a href="./rasterLayerPixelChart.html" target="_blank"><img data-toggle="tooltip" title="land cover composition pie chart" alt="scatterplot" src="img\land.png" class="img-snapshot" /></a>
+        <a href="./scatterplotdemo/" target="_blank"><img data-toggle="tooltip" title="scatter plot of landsat data" alt="scatterplot" src="img\scatter.png" class="img-snapshot" /></a>
+        <a href="./DimensionalProfileApp/Index_RainSnow.html" target="_blank"><img data-toggle="tooltip" title="dimensional profiles" alt="dimensional profiles" src="img\gldas.png" class="img-snapshot" /></a>
+      </div>
+    </div>
+    <hr class="featurette-divider">
+  
+    <hr class="featurette-divider">
+    <div class="row">
+      <div class="col-md-3">
+        <h5 class="featurette-heading">ArcGIS Online<span class="text-muted"></span></h5>
+        <p class="lead">Using your image services in ArcGIS Online map viewer and custom it with web app builder!</p>
+        <ul>
+          <li>
+            left: image services in ArcGIS Online;
+          </li>
+          <li>
+            right: using oblique viewer widget in Web App Builder. The application shows oblique images in their native image coordinate systems, top-up, undistorted. It requires an image service containing frame camera data.
+          </li>
+        </ul>
+      </div>
+      <div class="col-md-9">
+        <a href="//www.arcgis.com/home/webmap/viewer.html?webmap=8ec5453e6e2140d8a9f13455bc9cbebd" target="_blank"><img data-toggle="tooltip" title="image services in ArcGIS Online" alt="image services in ArcGIS Online" src="img\agol_101.png" class="img-snapshot" /></a>
+        <a href="//www.arcgis.com/apps/webappviewer/index.html?id=32fbc8e21c50414f8d007c7c318b5a7e" target="_blank"><img data-toggle="tooltip" title="oblique" alt="Oblique" src="img\oblique.png" class="img-snapshot" /></a>
+      </div>
+    </div>
+    <hr class="featurette-divider">
+    <div class="row featurette">
+      <div class="col-md-3 col-md-push-9">
+        <h2 class="featurette-heading">Latest and future<span class="text-muted"></span></h2>
+        <p class="lead">ArcGIS JS API comes with ready to use image service widgets!</p>
+        <ul>
+          <li>
+            left: View image services in 3D.
+          </li>
+          <li>
+            right: Raster Analytics --- Speed up and Scale up your processing!
+          </li>
+        </ul>
+      </div>
+      <div class="col-md-9 col-md-pull-3">
+        <a href="./3d" target="_blank"><img data-toggle="tooltip" title="oblique" alt="Oblique" src="img\3DImagery.png" class="img-snapshot" /></a>
+        <a href="//in_your_own_105_portal" target="_blank"><img data-toggle="tooltip" title="raster analytics" alt="raster analytics" src="img\ra.png" class="img-snapshot" /></a>
+      </div>
+    </div>
+
+    <hr class="featurette-divider">
+    <!-- /END THE FEATURETTES -->
+    <!-- FOOTER -->
+    <footer>
+      <p class="pull-right"><a href="#">Back to top</a></p>
+      <p>&copy; 2016 <a href="http://www.esri.com">Esri, Inc.</a> &middot; </p>
+    </footer>
+  </div><!-- /.container -->
+  <!-- Bootstrap core JavaScript
+  ================================================== -->
+  <!-- Placed at the end of the document so the pages load faster -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+  <script>window.jQuery || document.write('<script src="../../assets/js/vendor/jquery.min.js"><\/script>')</script>
+  <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+  <!-- Just to make our placeholder images work. Don't actually copy the next line! -->
+  <script src="../../assets/js/vendor/holder.min.js"></script>
+  <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+  <script src="../../assets/js/ie10-viewport-bug-workaround.js"></script>
+</body>
+</html>

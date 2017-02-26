@@ -1,0 +1,261 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no">
+    <title>Pixel Values Hover Over</title>
+    <link rel="stylesheet" href="http://js.arcgis.com/3.14/dijit/themes/claro/claro.css">
+    <link rel="stylesheet" href="http://js.arcgis.com/3.14/esri/css/esri.css">
+    <style>
+        html, body {
+            width: 98%;
+            height: 98%;
+            margin: 0 1%;
+            padding: 10px 0 0 0;
+        }
+
+        #map {
+            border: solid 1px #888;
+            padding: 0;
+        }
+
+        #searchWindow {
+            position: absolute;
+            left: 100px;
+            top: 35px;
+            z-index: 999;
+            text-align: left;
+        }
+
+        #status {
+            position: absolute;
+            left: 50px;
+            bottom: 30px;
+            background-color: #000;
+            color: #FFF;
+            padding: 3px;
+            z-index: 999;
+        }
+
+        .shadow {
+            -moz-border-radius: 6px;
+            -webkit-border-radius: 6px;
+            border-radius: 6px;
+            -moz-box-shadow: 0 6px 3px -3px #bdbdbd;
+            -webkit-box-shadow: 0 6px 3px -3px #bdbdbd;
+            box-shadow: 0 6px 3px -3px #bdbdbd;
+            background-color: #FFF;
+            padding: 8px;
+        }
+
+        #footer {
+            width: 400px;
+            padding: 10px;
+            padding-left: 50px;
+        }
+    </style>
+    <script type="text/javascript" src="http://js.arcgis.com/3.14/"></script>
+    <script>
+        require([
+            "esri/map",
+            "esri/domUtils",
+            "dojo/parser", "dojo/dom", "dojo/_base/url", "dojo/on",
+            "dijit/registry", "esri/dijit/Geocoder", "esri/layers/RasterLayer", "esri/layers/GraphicsLayer", "esri/layers/ArcGISDynamicMapServiceLayer", "esri/graphic", "esri/symbols/SimpleFillSymbol", "esri/geometry/Circle", 'esri/geometry/Extent', 'esri/SpatialReference', 'esri/InfoTemplate',
+            "dijit/layout/BorderContainer", "dijit/layout/ContentPane",
+            "dojo/keys",
+            "dojox/charting/Chart", "dojox/charting/plot2d/Pie", "dojox/charting/themes/MiamiNice",
+            "dojox/charting/action2d/Highlight", "dojox/charting/action2d/MoveSlice", "dojox/charting/action2d/Tooltip", "dojo/_base/lang",
+            "dojo/_base/Color", "dojox/charting/widget/Legend", "dijit/form/Button", "dojo/domReady!"
+        ], function(
+                Map,
+                domUtils,
+                parser, dom, Url, on,
+                registry, Geocoder, RasterLayer, GraphicsLayer, ArcGISDynamicMapServiceLayer, Graphic, SimpleFillSymbol, Circle, Extent, SpatialReference, InfoTemplate,
+                BorderContainer, ContentPane, keys,
+                Chart, Pie, MiamiNice,
+                Highlight, MoveSlice, Tooltip, lang,
+                Color, Legend
+                ) {
+            parser.parse();
+
+            var map, isRasterLayer, geocoder, canvasSupport, indexedColormap, graphicsLayer, symbol;
+            var infoTemplate = new InfoTemplate();
+            canvasSupport = supports_canvas();
+            indexedColormap = new Uint8Array(256 * 4);
+
+            var isUrl = "http://sampleserver6.arcgisonline.com/arcgis/rest/services/NLCDLandCover2001/ImageServer";
+
+            var corsEnabledServers, imageServiceAuthority, onceDone;
+            imageServiceAuthority = new Url(isUrl).authority;
+            corsEnabledServers = esriConfig.defaults.io.corsEnabledServers;
+            if (!corsEnabledServers.some(function(x) {
+                return x === imageServiceAuthority;
+            })) {
+                corsEnabledServers.push(imageServiceAuthority);
+            }
+
+            //var initExtent = new Extent(-2364615, 256035, 2266845, 3180435, new SpatialReference(5070));
+            var initExtent = new Extent(-129, 20, -62, 52, new SpatialReference(4326));
+            map = new Map("map", {
+                extent: initExtent
+            });
+
+            isRasterLayer = new RasterLayer(isUrl, {
+                opacity: 0,
+                pixelFilter: colorize
+            });
+
+            map.addLayer(isRasterLayer);
+
+            graphicsLayer = new GraphicsLayer({ id: "circles" });
+            map.addLayer(graphicsLayer);
+
+            symbol = new SimpleFillSymbol().setColor(null).outline.setColor("blue");
+
+
+
+            isRasterLayer.on("load", layerLoaded);
+            isRasterLayer.on("update-end", updatePixelBlock);
+            map.on("mouse-move", onMapMove);
+            map.on("mouse-down", function() { map.infoWindow.hide(); });
+
+            var originalPixelData;
+
+            function updatePixelBlock() {
+                originalPixelData = isRasterLayer.getPixelData(true);
+            }
+            ;
+
+            var pixelValCount, noDataValue;
+
+            function onMapMove(evt) {
+                graphicsLayer.clear();
+                map.infoWindow.hide();
+                map.infoWindow.resize(200, 150);
+                var template = "<b>Land Cover</b><hr><b> Code: ${Code}</b></br><b>Type: ${ClassName}</b></br><b>Long: ${X}W</b></br><b>Lat: ${Y}N</b>";
+
+                var     pixelBlock = originalPixelData.pixelBlock,
+                        height = pixelBlock.height,
+                        width = pixelBlock.width,
+                        reqX = evt.layerX,
+                        reqY = evt.layerY,
+                        pixels = pixelBlock.pixels[0],
+                		pixelIndex = Math.floor(reqY * width + reqX);
+                if (pixelBlock.mask === null || pixelBlock.mask[pixelIndex]) {
+                    var o = { Code: pixels[pixelIndex], ClassName: rasterATFeatures[pixels[pixelIndex]].ClassName, X: evt.mapPoint.x, Y: evt.mapPoint.y };
+                    map.infoWindow.setContent(template.replace("${Code}", o.Code).replace("${ClassName}", o.ClassName)
+                    .replace("${X}", o.X.toFixed(6)).replace("${Y}", o.Y.toFixed(6)));
+                    map.infoWindow.show(evt.screenPoint,
+                      map.getInfoWindowAnchor(evt.screenPoint));
+                }
+
+
+                var circle = new Circle({
+                    center: evt.mapPoint,
+                    geodesic: false,
+                    radius: 1
+                });
+
+                var graphic = new Graphic(circle, symbol);
+                graphicsLayer.add(graphic);
+            }
+
+
+            var rasterATFeatures = {};
+
+            function layerLoaded() {
+                geocoder = new Geocoder({
+                    map: map
+                }, "search");
+                geocoder.startup();
+                if (canvasSupport) {
+                    isRasterLayer.getRasterAttributeTable().then(function(response) {
+                        var data = response.features;
+                        var id = 0;
+                        for (var index in data) {
+                            rasterATFeatures[data[index].attributes.Value] = {
+                                "Blue": data[index].attributes.Blue,
+                                "ClassName": data[index].attributes.ClassName,
+                                "Green": data[index].attributes.Green,
+                                "Red": data[index].attributes.Red
+                            };
+                            id = data[index].attributes.Value * 4;
+                            indexedColormap[id] = data[index].attributes.Red;
+                            indexedColormap[id + 1] = data[index].attributes.Green;
+                            indexedColormap[id + 2] = data[index].attributes.Blue;
+                            indexedColormap[id + 3] = 255;
+                        }
+                        //isRasterLayer.setPixelFilter(colorize);
+                        //now we have colormap so we redraw and turn on the visiblity
+                        isRasterLayer.redraw();
+                        isRasterLayer.setOpacity(1);
+
+                    });
+
+
+                } else {
+                    dom.byId("welcomemsg").innerHTML = "This browser doesn't support canvas. Visit <a target='_blank' href='http://www.caniuse.com/#search=canvas'>caniuse.com</a> for supported browsers";
+                }
+            }
+
+            // The pixel filter
+            function colorize(pixelData) {
+                if (pixelData == null || pixelData.pixelBlock == null)
+                    return;
+                var pixelBlock = pixelData.pixelBlock;
+                var pixels = pixelBlock.pixels;
+                if (pixels.length >= 3) {
+                    throw "colormap only works on single band image";
+                }
+
+                var mask = pixelBlock.mask;
+                var numPixels = pixelBlock.width * pixelBlock.height;
+                if (pixels == null)
+                    return;
+
+                var p1 = pixels[0];
+                var pr = new Uint8Array(p1.length);
+                var pg = new Uint8Array(p1.length);
+                var pb = new Uint8Array(p1.length);
+                var val = 0;
+                if (mask)
+                    for (var i = 0; i < numPixels; i++) {
+                        if (mask[i]) {
+                            pr[i] = indexedColormap[p1[i] * 4];
+                            pg[i] = indexedColormap[p1[i] * 4 + 1];
+                            pb[i] = indexedColormap[p1[i] * 4 + 2];
+                            //mask[i] = indexedColormap[p1[i]*4+3];
+                        }
+                    }
+                else {
+                    for (var i = 0; i < numPixels; i++) {
+                        pr[i] = indexedColormap[p1[i] * 4];
+                        pg[i] = indexedColormap[p1[i] * 4 + 1];
+                        pb[i] = indexedColormap[p1[i] * 4 + 2];
+                    }
+                }
+
+                pixelData.pixelBlock.pixels = [pr, pg, pb];
+                //for U8 type, you don't need to worry about statistics, as raster layer draw pixel as is
+                pixelData.pixelBlock.statistics = null;
+                pixelData.pixelBlock.pixelType = "U8";
+                return pixelData;
+            }
+
+            // does the browser support canvas?
+            function supports_canvas() {
+                return !!document.createElement("canvas").getContext('2d');
+            }
+        });
+    </script>
+</head>
+<body class="claro">
+    <div id="map" class='shadow' data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region:'center'"
+         style="height: 100%;">
+        <div id="searchWindow"><div id="search"></div></div>
+        <div id="status">
+            Hover over to get land cover information...
+        </div>
+    </div>
+</body>
+</html>

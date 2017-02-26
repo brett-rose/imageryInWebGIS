@@ -1,0 +1,404 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no">
+  <title>Viewshed Raster Layer WebGL Demo</title>
+
+  <link rel="stylesheet" href="http://js.arcgis.com/3.15/dijit/themes/claro/claro.css">
+  <link rel="stylesheet" href="http://js.arcgis.com/3.15/esri/css/esri.css">
+  <script type="text/javascript">
+    var dojoConfig = {
+      parseOnLoad: false,
+      isDebug: false,
+      async: true,
+      packages: [
+        {
+          name: "pixelFilterGL",
+          location: location.pathname.replace(/\/[^/]+$/, "") + "/"
+        }
+      ]
+    };
+  </script>
+
+  <style>
+    html, body {
+      width: 98%;
+      height: 98%;
+      margin: 0 1%;
+      padding: 10px 0 0 0;
+    }
+
+    #mapCanvas {
+      border: solid 1px #888;
+      padding: 0;
+    }
+
+    #status {
+      background-color: #000;
+      color: #FFF;
+      border: solid 1px #FFF;
+      -moz-border-radius: 5px;
+      -webkit-border-radius: 5px;
+      border-radius: 5px;
+      padding: 3px;
+    }
+
+    .shadow {
+      -moz-border-radius: 6px;
+      -webkit-border-radius: 6px;
+      border-radius: 6px;
+      -moz-box-shadow: 0 6px 3px -3px #bdbdbd;
+      -webkit-box-shadow: 0 6px 3px -3px #bdbdbd;
+      box-shadow: 0 6px 3px -3px #bdbdbd;
+      background-color: #FFF;
+      padding: 8px;
+    }
+
+    #footer {
+      height: 80px;
+      padding: 10px;
+    }
+
+    #searchWindow {
+      position: absolute;
+      left: 80px;
+      top: 25px;
+      z-index: 999;
+      text-align: left;
+    }
+
+    #floatingWindow {
+      position: absolute;
+      right: 25px;
+      top: 15px;
+      z-index: 998;
+      width: 260px;
+      -moz-border-radius: 10px;
+      -webkit-border-radius: 10px;
+      background: url("images/blue.png") repeat scroll left top transparent;
+      border: solid 3px #028482;
+      color: #000000;
+      padding: 10px;
+      font-family: "Tahoma";
+      color: black;
+      text-align: left;
+    }
+  </style>
+  <script id="2d-vertex-shader" type="x-shader/x-vertex">
+    // from Microsoft example. you actually only need a very simple/basic vertex shader
+    // outgoing coordinate
+    varying vec2 v_texCoord;
+
+    // incoming coordinate (point)
+    attribute vec2 a_texCoord;
+
+    // maximum number of changes to grid
+    #define MAXPOINTS 10
+
+    uniform vec2 p1[MAXPOINTS];    // Where the drag started
+    uniform vec2 p2[MAXPOINTS];    // Where the drag ended
+
+    void main() {
+
+    v_texCoord = a_texCoord;
+    // Set up position variable with current coordinate normalized from 0 - 1 to -1 to 1 range
+    vec2 position = a_texCoord * 2.0 - 1.0;
+
+    for (int i = 0; i < MAXPOINTS; i++) // loop through
+    {
+    float dragdistance = distance(p1[i], p2[i]); // Calculate the distance between two start and end of mouse drag for each of the drags
+    float mydistance = distance(p1[i], position);  // Calculate the distance between the start of the mouse drag and the last position
+    if (mydistance < dragdistance)
+    {
+    vec2 maxdistort = (p2[i] - p1[i]) / 4.0;    // only affect vertices within 4 x the drag distance (
+    float normalizeddistance = mydistance / dragdistance;
+    float normalizedimpact = (cos(normalizeddistance*3.14159265359)+1.0)/2.0;
+    position += (maxdistort * normalizedimpact);
+    }
+    }
+    // gl_Position always specifies where to render this vector
+    //if (abs(position.s) < 0.5) {
+    gl_Position = vec4(position, 0.0, 1.0);     // x,y,z,
+    //}
+    }
+  </script>
+  <script id="2d-fragment-shader-viewshed" type="x-shader/x-fragment">
+    precision mediump float;
+
+    // uniform to use for texture
+    uniform sampler2D u_image;
+
+    // Output of the vertex shader
+    varying vec2 v_texCoord;
+
+    //uniform to use for screen pixel resolution, 0-1
+    uniform vec2 u_resolution;
+
+    //uniform to use for actual cell size (map)
+    uniform vec2 u_cellSize;
+
+    //uniform z observer Hight
+    uniform float u_observerHight;
+
+    //uniform observer
+    uniform vec2 u_observer;
+
+    //uniform
+    uniform bool u_floatTexture;
+
+    //help docs (exist as early as 9.3)
+    //http://resources.arcgis.com/en/help/main/10.2/index.html#/How_Aspect_works/009z000000vp000000/
+    //http://resources.arcgis.com/en/help/main/10.2/index.html#//009z000000z2000000
+    //http://resources.arcgis.com/en/help/main/10.2/index.html#/How_Slope_works/009z000000vz000000/
+    void main() {
+    vec2 currentCoord = v_texCoord + u_resolution* vec2(0, 0);
+    vec2 tempCoord = u_observer;
+    vec4 vo = texture2D(u_image, u_observer);
+    vec4 ve = texture2D(u_image, u_observer);
+    bool visible = false;
+    float a = 0.0;
+    float b = 0.0;
+    float deltax = 0.0;
+    float deltay = 0.0;
+    int maxLoops = 0;
+    deltax = abs((currentCoord.s - u_observer.s)/u_resolution.s);
+    deltay = abs((currentCoord.t - u_observer.t)/u_resolution.t);
+    maxLoops = int(deltax) < int(deltay)? int(deltay): int(deltax);
+    deltax = (currentCoord.s - u_observer.s) / float(maxLoops);
+    deltay = (currentCoord.t - u_observer.t) / float(maxLoops);
+
+    //maxLoops = 200;
+    float sight = vo.r+u_observerHight;//
+    //if (currentCoord.s < u_observer.s){
+    //visible = true;
+    //}
+    tempCoord = u_observer + u_resolution*vec2(0,0);
+    ve = texture2D(u_image, currentCoord);
+    //if (ve.r < vo.r){
+    //visible = false;
+    //}
+    //coord range 0-1; 0,0 is lowerleft
+
+    //if (currentCoord.y < u_observer.y){
+    //visible = false;
+    //}
+
+    for (int i=1; i < 2000; i++) {
+    if (maxLoops < i ){
+    break;
+    }
+    tempCoord = u_observer + u_resolution*vec2 (int(deltax * float (i)/u_resolution.s), int(deltay * float (i)/u_resolution.t));
+    ve = texture2D(u_image, tempCoord);
+
+    b = (ve.r - sight) / float(i);
+    if (a==0.0){
+    a=b;
+    visible = true;
+    }
+    else {
+    a = a < b ? b : a;
+    visible = (sight + a * float(i)) <= ve.r;
+    //visible = ve.r < sight;//2000.0;
+    }
+    //if (!visible)
+    //break;
+    }
+    //2050 - 2080
+
+
+    if (visible){
+    gl_FragColor = vec4(1.0, 0.0, 0.0, 0.5);
+    }
+    else {
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+    }
+    }
+  </script>
+
+  <script type="text/javascript" src="http://js.arcgis.com/3.15/"></script>
+  <script>
+    var map, isRasterLayer;
+    var canvasSupport;
+    var pixelFilter;
+    var slopeRange = 90;
+    var geocoder;
+    require([
+      "esri/map", "esri/IdentityManager",
+      "esri/domUtils", "esri/request",
+      "dojo/parser", "dojo/number", "dojo/json", "dojo/dom", "dojo/io-query", "dojo/_base/url", "dojo/has", "dojo/on", "dojo/keys",
+      "dijit/registry", "esri/layers/ArcGISTiledMapServiceLayer", "esri/layers/ArcGISDynamicMapServiceLayer", "esri/layers/RasterLayer", "pixelFilterGL/PixelFilterWebGL",
+      "esri/geometry/Extent", "esri/SpatialReference", "esri/dijit/Geocoder", "esri/symbols/SimpleMarkerSymbol", "esri/Color", "esri/graphic",
+      "dijit/layout/BorderContainer", "dijit/layout/ContentPane",
+      "dijit/form/HorizontalSlider", "dojox/form/RangeSlider", "dijit/form/HorizontalRule", "dijit/form/HorizontalRuleLabels", "dojox/gauges/GlossyCircularGauge", "dojo/domReady!"
+    ], function (
+      Map, esriId,
+      domUtils, esriRequest,
+      parser, number, JSON, dom, ioQuery, Url, has, on, keys,
+      registry, ArcGISTiledMapServiceLayer, ArcGISDynamicMapServiceLayer, RasterLayer, PixelFilterWebGL,
+      Extent, SpatialReference, Geocoder, SimpleMarkerSymbol, Color, Graphic, BorderContainer, ContentPane,
+      HorizontalSlider, RangeSlider, HorizontalRule, HorizontalRuleLabels, GlossyCircularGauge
+    ) {
+      parser.parse();
+      // does the browser support canvas?
+
+      var querystrings = window.location.search;
+      //This world elevation service is secured, you need to use an organization account to access
+      var isUrl = "http://elevation.arcgis.com/arcgis/rest/services/WorldElevation/Terrain/ImageServer";
+
+
+      var corsEnabledServers, imageServiceAuthority, onceDone;
+      imageServiceAuthority = new Url(isUrl).authority;
+      corsEnabledServers = esriConfig.defaults.io.corsEnabledServers;
+      if (!corsEnabledServers.some(function (x) {
+        return x === imageServiceAuthority;
+      })) {
+        corsEnabledServers.push(imageServiceAuthority);
+      }
+      //big bear
+      //var initExtent = new Extent(-13023319.666519351, 4057118.7987916414, -13005720.040756714, 4066081.0403580666, new SpatialReference(3857));
+      //palm springs
+      var initExtent = new Extent(-13007241.866862752, 3987288.0975016835, -12936843.3638122, 4023137.0637673824, new SpatialReference(3857));
+
+      map = new Map("mapCanvas", {
+        extent: initExtent,
+        basemap: "topo"
+      });
+
+      map.on("load", mapLoaded);
+
+
+      var markerSymbol = new SimpleMarkerSymbol();
+      markerSymbol.setPath("M16,4.938c-7.732,0-14,4.701-14,10.5c0,1.981,0.741,3.833,2.016,5.414L2,25.272l5.613-1.44c2.339,1.316,5.237,2.106,8.387,2.106c7.732,0,14-4.701,14-10.5S23.732,4.938,16,4.938zM16.868,21.375h-1.969v-1.889h1.969V21.375zM16.772,18.094h-1.777l-0.176-8.083h2.113L16.772,18.094z");
+      markerSymbol.setColor(new Color("#00FFFF"));
+
+
+      map.on("extent-change", function (evt) {
+        if (pixelFilter && pixelFilter.viewPoint) {
+          var pt = pixelFilter.viewPoint.pos;
+          if (pt)
+            pixelFilter.viewPoint = { s: ((pt.x - map.extent.xmin) / (map.extent.xmax - map.extent.xmin)), t: ((pt.y - map.extent.ymin) / (map.extent.ymax - map.extent.ymin)) };
+        }
+
+      });
+
+
+      moveHandle = map.on("click", function (evt) {
+        map.graphics.clear();
+        map.graphics.add(new Graphic(evt.mapPoint, markerSymbol));
+        //pixelFilter.viewPoint = { s: evt.layerX / map.width, t: 1 - evt.layerY / map.height };
+        //pixelFilter.radius = Infinity;
+        pixelFilter.viewPoint = { s: ((evt.mapPoint.x - map.extent.xmin) / (map.extent.xmax - map.extent.xmin)), t: ((evt.mapPoint.y - map.extent.ymin) / (map.extent.ymax - map.extent.ymin)), pos: evt.mapPoint };
+        //isRasterLayer.redraw();
+        pixelFilter.refresh();
+      });
+
+      
+
+      function mapLoaded() {
+        if (!supports_canvas()) {
+          alert("This app will not work properly. This browser is not supported.");
+          return;
+        }
+        // Add raster layer
+        var options = {
+          observerHeight: 1.75,
+          viewPoint: { s: 0.4375, t: 0.45 }
+        };
+        pixelFilter = new PixelFilterWebGL(options);
+        isRasterLayer = new RasterLayer(isUrl, {
+          opacity: 1,
+          pixelFilter: pixelFilter.viewshed,
+          drawMode: false,
+          drawType: "experimental-webgl"
+        });
+        pixelFilter.layer = isRasterLayer;
+        map.addLayer(isRasterLayer);
+
+        var originalHandler = isRasterLayer._extentChangeHandler;
+        isRasterLayer._extentChangeHandler = function (extent, delta, levelChange, lod) {
+          if (!delta || (delta && delta.x && delta.y)) //initial load or click (pan with nothing)
+            originalHandler.call(isRasterLayer, [extent, delta, levelChange, lod]);
+        }       
+
+        geocoder = new Geocoder({
+          map: map
+        }, "search");
+        geocoder.startup();
+      }
+
+      // does the browser support canvas?
+      function supports_canvas() {
+        return window.WebGLRenderingContext;
+      }
+    });
+
+    function changeObserverHeight(val) {
+      document.getElementById("elevationLabel").innerHTML = parseFloat(val).toFixed(2);
+      pixelFilter.observerHeight = parseFloat(val).toFixed(2);
+      pixelFilter.refresh();
+    }
+
+    function changeTransparency(val) {
+      document.getElementById("transparencyLabel").innerHTML = "Transparency :" + val.toFixed(0);
+      isRasterLayer.setOpacity(1 - parseInt(val.toFixed(0)) / 100);
+    }
+
+    function setPixelFilter() {
+      isRasterLayer.redraw();
+    }
+  </script>
+</head>
+
+<body class="claro">
+  <div data-dojo-type="dijit.layout.BorderContainer" design="headline" gutters="false" style="width: 100%; height: 100%; margin: 0;">
+    <div id="mapCanvas" data-dojo-type="dijit.layout.ContentPane" region="center" style="overflow:hidden;position:relative;">
+      <div id="searchWindow"><div id="search"></div></div>
+      <div id="floatingWindow">
+        <div class="shadow">
+          <div id="title">
+            <label>Interactive Viewshed Analysis</label>
+          </div>
+
+
+
+          <div id="divbasicFeatures">
+            <br />
+            <label>Click on the map to set the observer's location.</label>
+            <br>
+            <br>
+            <!--<label id="elevationLabel">
+                Observer height (m):
+            </label>
+            <input type="text" value="20" onchange="changeObserverHeight(this.value);" style="width: 3em; vertical-align: middle; border-radius:5px;" data-dojo-type="dijit/form/TextBox" id="elevationLower" />
+            <br />-->
+            <!--<label id="transparencyLabel">
+                Transparency:0
+            </label>
+            <div id="transparencySlider" dojotype="dijit.form.HorizontalSlider" onmousemove="changeTransparency(this.value);" onchange="changeTransparency(this.value);" onclick="changeTransparency(this.value);" value="0" maximum="100" minimum="0" pageincrement="1" showbuttons="true" intermediatechanges="true" slideduration="500">
+                <div data-dojo-type="dijit/form/HorizontalRule" data-dojo-props='container:"bottomDecoration", count:5, style:{height:"5px"}'></div>
+                <ol data-dojo-type="dijit/form/HorizontalRuleLabels" data-dojo-props='container:"bottomDecoration", style:{height:"1em",fontSize:"90%"}'>
+                    <li>0</li>
+                    <li>100</li>
+                </ol>
+            </div>-->
+            Observer height (m): <label id="elevationLabel">1.75</label>
+            <div id="transparencySlider" dojotype="dijit.form.HorizontalSlider" onmouseleave="changeObserverHeight(this.value);" onclick="    changeObserverHeight(this.value);" value="1.75" maximum="100" minimum="1.8" pageincrement="1" showbuttons="true" intermediatechanges="true" slideduration="500">
+              <div data-dojo-type="dijit/form/HorizontalRule" data-dojo-props='container:"bottomDecoration", count:5, style:{height:"5px"}'></div>
+              <ol data-dojo-type="dijit/form/HorizontalRuleLabels" data-dojo-props='container:"bottomDecoration", style:{height:"1em",fontSize:"90%"}'>
+                <li>0</li>
+                <li>100</li>
+              </ol>
+            </div>
+            <br />
+
+          </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

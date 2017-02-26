@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+        <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no">
+        <title>Raster Layer with Pixel Filter</title>
+
+        <link rel="stylesheet" href="http://js.arcgis.com/3.14/dijit/themes/claro/claro.css">
+        <link rel="stylesheet" href="http://js.arcgis.com/3.14/esri/css/esri.css">
+        <style>
+            html, body
+            {
+                width: 98%;
+                height: 98%;
+                margin: 0 1%;
+                padding: 10px 0 0 0;
+            }
+            #map
+            {
+                border: solid 1px #888;
+                padding: 0;
+            }
+            #status
+            {
+                background-color: #000;
+                color: #FFF;
+                border: solid 1px #FFF;
+                -moz-border-radius: 5px;
+                -webkit-border-radius: 5px;
+                border-radius: 5px;
+                padding: 3px;
+            }
+            .shadow
+            {
+                -moz-border-radius: 6px;
+                -webkit-border-radius: 6px;
+                border-radius: 6px;
+                -moz-box-shadow: 0 6px 3px -3px #bdbdbd;
+                -webkit-box-shadow: 0 6px 3px -3px #bdbdbd;
+                box-shadow: 0 6px 3px -3px #bdbdbd;
+                background-color: #FFF;
+                padding: 8px;
+            }
+            #footer
+            {
+                height: 90px;
+                padding: 15px;
+            }
+        </style>
+
+        <script type="text/javascript" src="http://js.arcgis.com/3.14/"></script>      
+        <script>
+            require([
+                "esri/map",
+                "esri/domUtils",
+                "esri/config",
+                "dojo/parser", "dojo/dom", "dojo/dom-construct", "dojo/_base/url", "dojo/on",
+                "dijit/registry", "esri/layers/RasterLayer", "esri/geometry/Extent", "esri/SpatialReference",
+                "dijit/layout/BorderContainer", "dijit/layout/ContentPane",
+                "dijit/form/HorizontalSlider", "dojox/form/RangeSlider", "dijit/form/HorizontalRule", "dijit/form/HorizontalRuleLabels",
+                "esri/layers/ImageServiceParameters", "esri/layers/MosaicRule", "esri/layers/RasterFunction", "esri/layers/DimensionalDefinition", "dojo/domReady!"
+            ], function (
+                    Map,
+                    domUtils, esriConfig,
+                    parser, dom, domConstruct, Url, on,
+                    registry, RasterLayer, Extent, SpatialReference,
+                    BorderContainer, ContentPane, HorizontalSlider, RangeSlider, HorizontalRule, HorizontalRuleLabels,
+                    ImageServiceParameters, MosaicRule, RasterFunction, DimensionalDefinition
+                    ) {
+                parser.parse();
+                var map, isRasterLayer, sliderMin, sliderMax, currentMin, currentMax, canvasSupport;
+                canvasSupport = supports_canvas();
+
+                function getParameter(name) {
+                    name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+                    var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+                            results = regex.exec(location.search);
+                    return results == null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+                }
+
+                var isUrl = getParameter("isUrl") ? getParameter("isUrl") : "http://sampleserver6.arcgisonline.com/arcgis/rest/services/ScientificData/SeaTemperature/ImageServer";
+                sliderMin = getParameter("sliderMin") ? parseFloat(getParameter("sliderMin")) : "null";
+                sliderMax = getParameter("sliderMax") ? parseFloat(getParameter("sliderMax")) : "null";
+
+                // hook up slider events
+                var slider = registry.byId("pixelSlider");
+                slider.on("mouseup", setPixelFilter);
+                slider.on("change", setPixelFilter);
+
+                var corsEnabledServers, imageServiceAuthority;
+                imageServiceAuthority = new Url(isUrl).authority;
+                corsEnabledServers = esriConfig.defaults.io.corsEnabledServers;
+                if (!corsEnabledServers.some(function (x) {
+                    return x === imageServiceAuthority;
+                })) {
+                    corsEnabledServers.push(imageServiceAuthority);
+                }
+
+                var initExtent = new Extent(-130, -68, 150, 68, new SpatialReference(4326));
+                map = new Map("map", {
+                    extent: initExtent,
+                    basemap: "oceans"
+                });
+                map.on("update-start", function () {
+                    domUtils.show(dom.byId("status"));
+                });
+                map.on("update-end", function () {
+                    domUtils.hide(dom.byId("status"));
+                });
+                map.on("load", mapLoaded);
+
+                var colorRamp = [];
+                for (var i = 0; i < 256; i++) {
+                    colorRamp.push(
+                            [i, 0, 255 - i]
+                            );
+                }
+
+                function mapLoaded() {
+                    // Add layer                  
+                    if (canvasSupport) {
+                        var dim = [];
+                        dim.push(new DimensionalDefinition({
+                            variableName: "water_temp",
+                            dimensionName: "StdZ",
+                            values: [0],
+                            isSlice: true
+                        }));
+                        dim.push(new DimensionalDefinition({
+                            "variableName": "water_temp",
+                            "dimensionName": "StdTime",
+                            "values": [1396828800000],
+                            "isSlice": true}));
+
+                        var defaultMosaic = {};
+                        defaultMosaic.multidimensionalDefinition = dim;
+                        var params = new ImageServiceParameters();
+                        params.mosaicRule = new MosaicRule(defaultMosaic);
+						//the service has a default "Stretched" function and a "None" function, we want original data "None".
+						var rf = new RasterFunction();
+						rf.functionName = "None";
+						params.renderingRule = rf;
+
+                        isRasterLayer = new RasterLayer(isUrl, {
+                            opacity: 1,
+                            pixelFilter: maskPixels,
+                            imageServiceParameters: params
+                        });
+                        map.addLayer(isRasterLayer);
+
+                        isRasterLayer.on("load", function () {
+                            isRasterLayer.on("update-start", function () {
+                                domUtils.show(dom.byId("status"));
+                            });
+                            isRasterLayer.on("update-end", function () {
+                                domUtils.hide(dom.byId("status"));
+                            });
+
+                            if (!sliderMax || sliderMax === "null") {
+                                if (isRasterLayer.bands && isRasterLayer.bands[0] && isRasterLayer.bands[0].min) {
+                                    sliderMin = Math.floor(isRasterLayer.bands[0].min);
+                                    sliderMax = Math.floor(isRasterLayer.bands[0].max);
+                                }
+                                else {
+                                    sliderMin = 0;
+                                    sliderMax = 255;
+                                }
+                            }
+                            if (sliderMax) {
+                                registry.byId("pixelSlider").minimum = sliderMin;
+                                registry.byId("pixelSlider").maximum = sliderMax;
+                                registry.byId("pixelSlider").value = [sliderMin, sliderMax];
+                                var sliderLabels = new HorizontalRuleLabels(
+                                        {
+                                            container: "bottomDecoration",
+                                            labels: [sliderMin.toFixed(0).toString(), sliderMax.toFixed(0).toString()]
+                                        }, domConstruct.create("div", {}, dom.byId("pixelLabels")));
+                                sliderLabels.startup();
+                            }
+                            setPixelFilter();
+                        });
+                    } else {
+                        alert("This browser doesn't support canvas. Visit <a target='_blank' href='http://www.caniuse.com/#search=canvas'>caniuse.com</a> for supported browsers");
+                    }
+                }
+                // The pixel filter
+                function maskPixels(pixelData) {
+				    
+                    if (pixelData == null || pixelData.pixelBlock == null) {
+                        return;
+                    }
+                    if (currentMin === undefined || currentMax === undefined) {
+                        return;
+                    }
+                    var pixelBlock = pixelData.pixelBlock;
+                    var pixels = pixelBlock.pixels;
+                    var mask = pixelBlock.mask;
+                    var numPixels = pixelBlock.width * pixelBlock.height;
+                    var minVal = isRasterLayer.bands[0].min;
+                    var factor = 255.0 / (isRasterLayer.bands[0].max - isRasterLayer.bands[0].min);
+                    if (pixels == null) {
+                        return;
+                    }
+                    var p1 = pixels[0];
+                    var pr = new Uint8Array(p1.length);
+                    var pg = new Uint8Array(p1.length);
+                    var pb = new Uint8Array(p1.length);
+
+					if (mask == null) {
+					    mask = new Uint8Array(p1.length);
+					    pixelBlock.mask = mask;
+					}					
+
+                    for (var i = 0; i < numPixels; i++) {
+                        mask[i] = (p1[i] >= Math.floor(currentMin) && p1[i] <= Math.floor(currentMax)) ? 1 : 0;
+                    }
+                    var p = [];
+                    for (var i = 0; i < numPixels; i++) {
+                        if (mask[i]) {
+                            p[i] = Math.floor((p1[i] - minVal) * factor);
+                            pr[i] = colorRamp[p[i]][0];
+                            pg[i] = colorRamp[p[i]][1];
+                            pb[i] = colorRamp[p[i]][2];
+                        }
+                    }
+                    pixelData.pixelBlock.pixels = [pr, pg, pb];
+                    pixelData.pixelBlock.statistics = null;
+                    pixelData.pixelBlock.pixelType = "U8";
+                    return pixelData;
+                }
+                // Slider move
+                function setPixelFilter() {
+                    var val = registry.byId("pixelSlider").get("value");
+                    if (val) {
+                        dom.byId("pixelVal").innerHTML = "Currently displaying locations with sea temperatures from " + Math.floor(val[0]) + "°C to " + Math.floor(val[1]) + "°C";
+                    }
+                    else {
+                        dom.byId("pixelVal").innerHTML = "Currently displaying all values in the AOI.";
+                    }
+                    currentMin = val[0];
+                    currentMax = val[1];
+                    isRasterLayer.redraw();
+                }
+                // does the browser support canvas? 
+                function supports_canvas() {
+                    return true;
+                }
+            });
+        </script>
+    </head>
+
+    <body class="claro">
+        <div data-dojo-type="dijit/layout/BorderContainer" data-dojo-props="design:'headline', gutters:false"
+             style="width: 100%; height: 100%; margin: 0;">     
+            <div id="map" class='shadow' data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region:'center'"
+                 style="height: 100%;">
+                <div id="status" style="position: absolute; right: 10px; bottom: 10px; z-index: 99;">
+                    Loading...
+                </div>
+            </div>
+            <div id="footer" data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region:'bottom'">
+                <span style='font-weight: 600; font-size: 130%;' id='elevSpan'>Sea Surface Temperature (°C) on April 7, 2014</span><br><br>
+                <div id='pixelVal'></div>
+                <div id="pixelSlider" data-dojo-type="dojox/form/HorizontalRangeSlider" data-dojo-props="showButtons:'false', intermediateChanges:'false', slideDuration:'0'">
+                    <div data-dojo-type="dijit/form/HorizontalRule" data-dojo-props='container:"bottomDecoration", count:2, style:{height:"5px"}'></div>
+                    <div id="pixelLabels"></div>
+                </div>
+            </div>
+        </div>
+    </body>
+
+</html>

@@ -1,0 +1,245 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=7, IE=9">
+  <meta name="viewport" content="width=device-width,user-scalable=no">
+  <!--The viewport meta tag is used to improve the presentation and behavior of the samples
+    on iOS devices-->
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no">
+  <title>ISDemo: GetSamples/Profile</title>
+  <link rel="stylesheet" href="http://js.arcgis.com/3.16/dijit/themes/claro/claro.css">
+  <link rel="stylesheet" href="http://js.arcgis.com/3.16/esri/css/esri.css">
+  <style>
+    html, body {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    #drawTools {
+      position: absolute;
+      right: 25px;
+      top: 25px;
+      z-index: 998;
+      width: auto;
+      padding: 5px;
+      overflow: auto;
+      border: solid 2px #AAAAAA;
+      background-color: #FFFFFF;
+      -moz-border-radius: 5px;
+      -webkit-border-radius: 5px;
+      -o-border-radius: 5px;
+      border-radius: 5px;
+      -moz-box-shadow: 0 0 0.5em black;
+      -webkit-box-shadow: 0 0 0.5em black;
+      -o-box-shadow: 0 0 0.5em black;
+      box-shadow: 0 0 0.5em black;
+    }
+
+    #chartNode {
+      position: absolute;
+      z-index: 100;
+      width: 50%;
+      height: 200px;
+      left: 25%;
+      margin-left: auto;
+      margin-right: auto;
+      bottom: 50px;
+    }
+  </style>
+
+  <script src="http://js.arcgis.com/3.16/"></script>
+  <script>
+    require([
+        "dojo/parser", "dojo/ready", "dojo/on", "dojo/dom",
+        "esri/map", "esri/layers/ArcGISImageServiceLayer", "esri/layers/ImageServiceParameters", "esri/toolbars/draw",
+        "dijit/form/RadioButton", "dijit/form/CheckBox", "dijit/form/TextBox", "dijit/form/Button", "dijit/layout/BorderContainer", "dijit/layout/ContentPane", "dijit/form/HorizontalSlider", "dijit/registry",
+        "dojox/charting/widget/Chart2D", "dojox/charting/themes/Claro", "dojo/domReady!"
+    ], function (parser, ready, on, dom,
+        Map, ArcGISImageServiceLayer, ImageServiceParameters, Draw,
+        RadioButton, CheckBox, TextBox, Button, BorderContainer, ContentPane, HorizontalSlider, registry,
+        Chart2D, Claro) {
+      ready(function () {
+        parser.parse();
+        var map, toolbar, symbol, geomTask, imageservicelayer;
+        var chartData, chartX, minpixelvalue, maxpixelvalue, chartPoints;
+        var anchorgeometry, thegraphic;
+        var op = "";
+        var samplegeometryType = "";
+        var layerUrl = "http://sampleserver6.arcgisonline.com/arcgis/rest/services/CharlotteLAS/ImageServer";
+
+        on(registry.byId("btnLine"), "click", function () { setOp(''); toolbar.activate(Draw.LINE); map.hideZoomSlider(); });
+        on(registry.byId("btnPolyline"), "click", function () { setOp(''); toolbar.activate(Draw.POLYLINE); map.hideZoomSlider(); });
+        on(registry.byId("btnFreehand"), "click", function () { setOp(''); toolbar.activate(Draw.FREEHAND_POLYLINE); map.hideZoomSlider(); });
+        on(registry.byId("btnClear"), "click", function () { setOp(''); });
+        map = new Map("mapdiv", {
+          //basemap: "streets",
+          //center: [-15.469, 36.428],
+          //zoom: 3
+        });
+        var params = new ImageServiceParameters();
+        imageServiceLayer = new ArcGISImageServiceLayer(layerUrl, { imageServiceParameters: params });
+        map.addLayer(imageServiceLayer);
+
+        on(map, "Load", createToolbar);
+
+
+        function setOp(val) {
+          map.graphics.clear();
+          dojo.empty("chartNode");
+          op = val;
+          map.infoWindow.hide();
+        }
+
+        //create the draw toolbar
+        function createToolbar(themap) {
+          toolbar = new Draw(map);
+          dojo.connect(toolbar, "onDrawEnd", addToMap);
+        }
+
+        //add lines to map
+        function addToMap(geometry) {
+          toolbar.deactivate();
+          map.showZoomSlider();
+          switch (geometry.type) {
+            case "polyline":
+              samplegeometryType = "esriGeometryPolyline";
+              var symbol = new esri.symbol.SimpleLineSymbol(esri.symbol.SimpleLineSymbol.STYLE_SOLID, new dojo.Color([255, 0, 0]), 5);
+              break;
+          }
+          var graphic = new esri.Graphic(geometry, symbol);
+          if (geometry.type == "point") {
+            thegraphic = graphic;
+          }
+          map.graphics.add(graphic);
+          if (geometry.type == "polyline" || geometry.type == "multipoint") {
+            anchorgeometry = geometry;
+            doGetSamples(anchorgeometry);
+          }
+        }
+
+
+        function doGetSamples(pline) {
+          console.log(JSON.stringify(pline.toJson()));
+          var callbackfunc = {
+            chartit: function (response) {
+              console.log("Success: ");
+              if (response.samples && response.samples.length > 0)
+                showChart(response.samples);
+            }
+          };
+          var errorbackfunc = {
+            chartit: function (error) {
+              console.log(error.message);
+            }
+          };
+          var layersRequest = esri.request({
+            url: layerUrl + "/getSamples",
+            content: {
+              geometry: JSON.stringify(pline.toJson()),
+              geometryType: samplegeometryType,
+              sampleCount: 20,
+              returnFirstValueOnly: true,
+              f: "json"
+            },
+            handleAs: "json",
+            callbackParamName: "callback"
+          });
+
+          layersRequest.then(
+          dojo.hitch(callbackfunc, "chartit"),
+          dojo.hitch(errorbackfunc, "chartit"));
+
+          function showChart(samples) {
+            var chartData1 = [];
+            chartX = [];
+            chartPoints = [];
+            minpixelvalue = 9999;
+            maxpixelvalue = -9999;
+            var tempval = 0;
+            var tempdist = 0;
+            for (var k = 0; k < samples.length; k++) {
+              if (samplegeometryType == "esriGeometryMultipoint")
+                tempdist = k;
+              else if (k == 0)
+                tempdist = 0;
+              else
+                tempdist = tempdist + Math.pow((Math.pow((samples[k].location.x - samples[k - 1].location.x), 2) + Math.pow((samples[k].location.y - samples[k - 1].location.y), 2)), 0.5);
+              chartX.push({ value: k + 1, text: (parseInt(tempdist)).toString() });
+              chartPoints.push({ value: k + 1, loc: samples[k].location });
+              tempval = parseFloat(samples[k].value);
+              minpixelvalue = tempval < minpixelvalue ? tempval : minpixelvalue;
+              maxpixelvalue = tempval > maxpixelvalue ? tempval : maxpixelvalue;
+              chartData1.push({ y: tempval, tooltip: samples[k].value });
+            }
+
+            var chart = new dojox.charting.Chart2D("chartNode");
+
+            // Set the theme
+            chart.setTheme(dojox.charting.themes.Claro);
+
+            // Add the only/default plot
+            chart.addPlot("default", {
+              type: "Lines",
+              markers: true
+            });
+
+            chart.title = "Distance-Elevation (m)";
+
+            // Add axes
+            chart.addAxis("x", { labels: chartX });
+            minval = parseInt(minpixelvalue) - 10;
+            maxval = parseInt(maxpixelvalue) + 10;
+            chart.addAxis("y", { min: minval, max: maxval, vertical: true, fixLower: "None", fixUpper: "None" });
+
+            var tooltip = new dojox.charting.action2d.Tooltip(chart, "default");
+            // Add the series of data
+            chart.addSeries("ElevationProfile", chartData1);
+
+
+            // Render the chart!
+            chart.render();
+            chart.connectToPlot("default", function (evt) {
+              if (evt.element == "marker") {
+                if (evt.type == "onmouseover") {
+                  for (var j = 0; j < chartPoints.length; j++) {
+                    if (chartPoints[j].value == evt.x) {
+                      addToMap(chartPoints[j].loc);
+                      break;
+                    }
+                  }
+                }
+                else if (evt.type == "onmouseout") {
+                  map.graphics.remove(thegraphic);
+                }
+              }
+            });
+
+          }
+        }
+      });
+    });</script>
+</head>
+<body class="claro">
+  <div id="mainWindow" data-dojo-type="dijit.layout.BorderContainer" data-dojo-props="design:'headline'" style="width: 100%; height: 100%;">
+    <!-- create the chart -->
+    <div>
+      <div id="mapdiv" data-dojo-type="dijit.layout.ContentPane" data-dojo-props="region:'center'">
+        <div id="drawTools">
+          <span>
+            Draw a line to show elevation profile:<br />
+            <br />
+          </span>
+          <button id="btnLine" data-dojo-type="dijit.form.Button">Line</button>
+          <button id="btnPolyline" data-dojo-type="dijit.form.Button">Polyline</button>
+          <button id="btnFreehand" data-dojo-type="dijit.form.Button">FreeHand</button>
+          <button id="btnClear" data-dojo-type="dijit.form.Button">Clear</button>
+        </div>
+        <div id="chartNode"></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

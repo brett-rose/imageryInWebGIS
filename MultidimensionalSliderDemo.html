@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Multidimensional Slider</title>
+    <meta charset="windows-1252">
+    <meta name="viewport" content="width=device-width">
+    <style>
+      html, body, #map, #main
+      {
+        height: 100%;
+        width: 100%;
+        margin: 0!important;
+        padding: 0!important;
+        gutters: false;
+      }
+
+      #mdSlider
+      {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        height: 500px;
+        width: 100px;
+        border: 1px solid #AFAFAF;
+        background-color: #EEEEEE;
+      }
+
+      /*this is all we need for css to make floating pane look more like a dialog*/
+      .dojoxFloatingPane {
+        padding:0 !important;
+        border:solid 1px #769DC0 !important;
+        overflow:hidden;
+        -moz-box-shadow:6px 6px 14px rgba(0, 0, 0, 0.45) !important;
+        box-shadow:6px 6px 14px rgba(0, 0, 0, 0.45) !important;
+        -webkit-box-shadow:6px 6px 14px rgba(0, 0, 0, 0.45) !important;
+        z-index: 1000;
+        -webkit-border-radius: 5px;
+        -moz-border-radius: 5px;
+        border-radius: 5px;
+      }
+      .dojoxFloatingPaneTitle {
+        background:#ABD6FF url('../../../dijit/themes/claro/images/activeGradient.png') repeat-x !important;
+        background-repeat: repeat-x;
+        background-image: -moz-linear-gradient(rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0) 100%);
+        background-image: -webkit-linear-gradient(rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0) 100%);
+        background-image: -o-linear-gradient(rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0) 100%);
+        background-image: linear-gradient(rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0) 100%);
+        _background-image: none;
+        border: 1px solid #b5bcc7;
+        padding: 0 7px 3px 7px;
+        min-height: 17px;
+        color: #494949;
+      }
+      .dojoxFloatingPaneContent {
+        border-top:solid 1px #769DC0;
+        padding:0px;
+        overflow:hidden !important;
+        width:100% !important;
+        height:100% !important;
+      }
+      .dojoxFloatingMinimizeIcon {
+        width:15px !important;
+        height:15px !important;
+        margin-right:6px !important;
+        padding-right:6px !important;
+        background:url('../devsummit2015/dialogCloseIcon.png') no-repeat 0 0 !important;
+      }
+
+      .dojoxFloatingCloseIcon{
+        display: none;
+      }
+    </style>
+        <link rel="stylesheet" href="http://js.arcgis.com/3.13/dijit/themes/claro/claro.css">
+        <link rel="stylesheet" href="http://js.arcgis.com/3.13/esri/css/esri.css">
+        <link rel="stylesheet" href="http://js.arcgis.com/3.13/dojox/layout/resources/FloatingPane.css">
+    <script type="text/javascript">
+      var dojoConfig = {
+        parseOnLoad: true,
+      };
+    </script>
+      <script type="text/javascript" src="http://js.arcgis.com/3.13/"></script>  
+    <script type="text/javascript">
+      require(["dojo/ready",
+        "dojo/parser",
+        "esri/dijit/MultidimensionalSlider",
+        "esri/map",
+        "esri/layers/ArcGISImageServiceLayer",
+        "dojo/dnd/Moveable",
+        "dojo/_base/url",
+        "esri/request",
+        "esri/dijit/TimeSlider",
+        "dojo/_base/array",
+        "dojo/Deferred",
+        "dijit/registry",
+        "esri/graphic",
+        "esri/symbols/SimpleMarkerSymbol",
+        "dojox/charting/Chart",
+        "dojox/charting/axis2d/Default",
+        "dojox/charting/plot2d/Markers",
+        "dojox/charting/themes/PurpleRain",
+        "dojox/charting/action2d/Tooltip",
+        "dojo/dom-style",
+        "dijit/layout/BorderContainer",
+        "dijit/layout/ContentPane",
+        "dojox/layout/FloatingPane",
+        "dojo/domReady!"],
+              function (ready, parser, MdSlider, Map, ImageServiceLayer, Moveable, Url,
+                      esriRequest, TimeSlider, array, Deferred, registry,
+                      Graphic, SimpleMarkerSymbol,
+                      Chart, Default, Markers, Wetland, Tooltip, domStyle) {
+
+                ready(function () {
+                  var map = new Map("map", {
+                    basemap: "topo"
+                  });
+
+                  map.resize();
+
+                  registry.byId("dFloatingPane").dockTo.domNode.style.display = "none";
+
+                  function getParameterByName (name) {
+                    name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+                    var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+                            results = regex.exec(location.search);
+                    return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+                  }
+
+                  var isUrl = getParameterByName("isUrl");
+                  var gsUrl = "http://sampleserver6.arcgisonline.com/arcgis/rest/services/Utilities/Geometry/GeometryServer";
+                  isUrl = isUrl ? isUrl : "http://sampleserver6.arcgisonline.com/arcgis/rest/services/ScientificData/SeaTemperature/ImageServer";
+                  var dim = getParameterByName("dim");
+                  dim = dim ? dim : "StdZ";
+                  var variableString, mapPoint;
+
+                  var markerSymbol = new SimpleMarkerSymbol({"color": [0, 0, 128, 128],
+                    "size": 18,
+                    "angle": 0,
+                    "xoffset": 0,
+                    "yoffset": 0,
+                    "type": "esriSMS",
+                    "style": "esriSMSCross",
+                    "outline": {"color": [0, 0, 128, 255],
+                      "width": 1,
+                      "type": "esriSLS",
+                      "style": "esriSLSSolid"}
+                  });
+
+                  //slider variables
+                  var mdSlider, timeSlider;
+
+                  //chart variables
+                  var chart, chartConnects, tooltip;
+
+                  var corsEnabledServers, imageServiceAuthority, geometryServiceAuthority, exportWebmapServiceAuthority, onceDone;
+                  imageServiceAuthority = new Url(isUrl).authority;
+                  corsEnabledServers = esri.config.defaults.io.corsEnabledServers;
+
+                  if (!corsEnabledServers.some(function (x) {
+                    return x === imageServiceAuthority;
+                  })) {
+                    corsEnabledServers.push(imageServiceAuthority);
+                  }
+
+                  geometryServiceAuthority = new Url(gsUrl).authority;
+
+                  if (!corsEnabledServers.some(function (x) {
+                    return x === geometryServiceAuthority;
+                  })) {
+                    corsEnabledServers.push(geometryServiceAuthority);
+                  }
+
+				  var isLayer = new ImageServiceLayer(isUrl);
+                  map.addLayer(isLayer);
+                  isLayer.setUseMapTime(true);
+
+                  isLayer.on("load", function () {
+                    setISLayerExtent();
+
+                    mdSlider = new MdSlider({
+                      map: map,
+                      dimension: dim,
+                      layout: MdSlider.LAYOUT_VERTICAL,
+                      thumbCount: 1,
+                      showPlayButton: true
+                    }, "mdSlider");
+
+                    mdSlider.startup();
+
+                    var moveableSlider = new Moveable(document.getElementById("mdSlider"));
+
+                    var tsDiv = dojo.create("div", null, dojo.byId('timeSliderDiv'));
+
+                    timeSlider = new TimeSlider({
+                      id: 'timeSlider',
+                      style: 'width: 100%',
+                      thumbCount: 2,
+                      loop: true
+                    }, tsDiv);
+
+                    map.setTimeSlider(timeSlider);
+
+                    timeSlider.createTimeStopsByTimeInterval(isLayer.timeInfo.timeExtent, 1, "esriTimeUnitsDays");
+                    timeSlider.startup();
+
+                    setTimeString(map.timeExtent);
+                    timeSlider.on('time-extent-change', function (args) {
+                      setTimeString(args);
+                    });
+
+                  });
+
+                  function setTimeString (args) {
+                    dojo.byId("timeValue").innerHTML = "<b>Time: </b>" + (args.startTime.toUTCString().substring(5, 22) + " to " + args.endTime.toUTCString().substring(5, 22));
+                  }
+
+                  function setISLayerExtent () {
+                    if (isLayer.fullExtent.spatialReference.equals(map.spatialReference)) {
+                      map.setExtent(isLayer.fullExtent);
+                    } else {
+                      esriRequest({
+                        url: gsUrl + "/project",
+                        handleAs: "json",
+                        content: {
+                          f: "json",
+                          geometries: JSON.stringify({
+                            geometryType: "esriGeometryEnvelope",
+                            geometries: [isLayer.fullExtent.toJson()]
+                          }),
+                          inSR: JSON.stringify(isLayer.fullExtent.spatialReference.toJson()),
+                          outSR: JSON.stringify(map.spatialReference.toJson())
+                        },
+                        load: function (response) {
+                          map.setExtent(new Extent(response.geometries[0]).setSpatialReference(map.spatialReference));
+                        },
+                        error: function () {
+                        }
+                      });
+                    }
+                  }
+
+                  map.on("click", function (evt) {
+                    if (evt.ctrlKey) {
+                      mapPoint = evt.mapPoint;
+                      mapPoint.x = map.extent._normalizeX(mapPoint.x, map.extent.spatialReference._getInfo()).x;
+                      drawProfile();
+                    }
+                  });
+                  
+                  
+                  isLayer.on("update-start", function(){
+                    if (domStyle.get(registry.byId("dFloatingPane").domNode, "visibility") != "hidden") {
+                      drawProfile();
+                    }
+                  });
+                  
+                  function drawProfile() {
+                    if(mapPoint){
+                      map.graphics.clear();
+                      map.graphics.add(new Graphic(mapPoint, markerSymbol));
+                      esriRequest({
+                        url: isLayer.url + "/identify",
+                        handleAs: "json",
+                        content: {
+                          f: "json",
+                          //time: JSON.stringify([map.timeExtent.startTime.valueOf(), map.timeExtent.endTime.valueOf()]),
+                          mosaicRule: JSON.stringify(isLayer.mosaicRule.toJson()),
+                          geometry: JSON.stringify(mapPoint.toJson()),
+                          geometryType: "esriGeometryPoint"
+                        },
+                        load: function (response) {
+                          //console.log(response);
+                          document.getElementById("chartDiv").innerHTML = "";
+                          domStyle.set(registry.byId("dFloatingPane").domNode, "top", domStyle.get(registry.byId("dFloatingPane").domNode, "top") - 5);
+                          domStyle.set(registry.byId("dFloatingPane").domNode, "left", domStyle.get(registry.byId("dFloatingPane").domNode, "left") - 5);
+                          registry.byId("dFloatingPane").show();
+                          document.getElementById("profileTitle").innerHTML = "Variation at <b>" + (mdSlider.dimensionAlias || mdSlider.dimension) + "</b>: " + getDimensionValue(isLayer) + " " + mdSlider.unit;
+                          if (tooltip) {
+                            tooltip.disconnect();
+                          }
+                          chart = new Chart("chartDiv");
+                          chart.addPlot("default", {type: Markers, tension: 3})
+                                  .addAxis("x", {fixLower: "major", fixUpper: "major", labelFunc: function(text, val){
+									return new Date(val).toUTCString().substring(5, 16)
+									}})
+                                  .addAxis("y", {vertical: true, fixLower: "major", fixUpper: "major", min: 0,
+                                    title: getVariable(isLayer),
+                                    titleGap: 5,
+                                    enableCache: true,
+                                    htmlLabels: false,
+                                    titleOrientation: "away"})
+                                  .setTheme(Wetland)
+                                  .addSeries("Series A",
+                                          (function () {
+                                            var series = [], i = 0;
+                                            array.forEach(response.catalogItems.features, function (feature, idx) {
+											var identifyValue = response.properties.Values[idx];
+											var timeValue = feature.attributes.StdTime;
+                                              var timeString = new Date(timeValue).toUTCString().substring(5, 16);
+                                              var tooltip1 = variableString + ": " + identifyValue + "<br/> StdTime: " + timeString;												  
+                                              series.push({
+                                                x: timeValue,
+                                                y: identifyValue,
+                                                tooltip: tooltip1
+                                              });
+                                            });
+                                            return series;
+                                          })());
+                          tooltip = new Tooltip(chart, "default");
+                          
+                          chart.render();                          
+                        }
+                      });
+                    }
+                  }
+
+                  function getTimeString (time) {
+                    var date = new Date(time);
+                    return (date.getUTCMonth() + "/" + date.getUTCDate());
+                  }
+                  ;
+
+                  function getValues (arrArg) {
+                    var a;
+                    array.forEach(arrArg, function (element, i) {
+                      a = parseFloat(element);
+                      if (!isNaN(a)) {
+                        arrArg[i] = a;
+                      } else {
+                        arrArg[i] = null;
+                      }
+                    });
+
+                    return arrArg;
+                  }
+
+                  function getDimensionValue (layer) {
+                    var val;
+                    if (layer.mosaicRule && layer.mosaicRule.multidimensionalDefinition && layer.mosaicRule.multidimensionalDefinition.length) {
+                      array.some(layer.mosaicRule.multidimensionalDefinition, function (dimDef) {
+                        if (dimDef.dimensionName == mdSlider.dimension) {
+                          val = dimDef.values[0];
+                          return true;
+                        }
+                      });
+                    }
+                    return val;
+                  }
+
+                  function getVariable (layer) {
+                    variableString = "";
+                    if (layer.multidimensionalInfo && layer.multidimensionalInfo.variables && layer.multidimensionalInfo.variables.length == 1) {
+                      variableString = layer.multidimensionalInfo.variables[0].name;
+                      if (layer.multidimensionalInfo.variables[0].unit) {
+                        variableString += " (" + layer.multidimensionalInfo.variables[0].unit + ")";
+                      }
+                    }
+                    return variableString;
+                  }
+
+                  document.onkeydown = function () {
+                    var key = event.keyCode || event.charCode;
+
+                    if (key == 8 || key == 46){
+                      map.graphics.clear();
+                    }
+                      
+                  };
+                });
+              });
+    </script>
+  </head>
+  <body class="claro">
+    <div id="main" data-dojo-type="dijit/layout/BorderContainer">
+      <div data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region:'center'" style='width: 100%!important; padding: 0!important;'>
+        <div id='map' ></div>
+        <div data-dojo-type="dojox/layout/FloatingPane" id="dFloatingPane"
+             accesskey="" title="Profile" data-dojo-props="resizable:true, dockable:true, title:'Profile', closeable:false"
+             class="" style="position:absolute;top:0;left:0;width:400px;height:330px;visibility:hidden;">
+          <div id='floatingPaneContent'>
+            <div id='profileTitle' style='height: 20px; padding-left: 10px; padding-top: 5px;'></div>
+            <div id='chartDiv' style='height: 280px; width: 100%;'></div>
+          </div>
+        </div>
+        <div id="mdSlider"></div>
+      </div>
+      <div data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region:'bottom'" style="height: 70px; background: #eeeeee; width: 100%!important;  padding: 0!important;">
+        <div style="width: 100%;" id="timeSliderDiv"></div>
+        <div id="timeValue" style='margin: 10px 0 0 400px;'></div>
+      </div>
+
+    </div>
+  </body>
+</html>

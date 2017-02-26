@@ -1,0 +1,396 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no">
+    <title>Land Cover Composition Chart</title>
+    <link rel="stylesheet" href="http://js.arcgis.com/3.14/dijit/themes/claro/claro.css">
+    <link rel="stylesheet" href="http://js.arcgis.com/3.14/esri/css/esri.css">
+    <style>
+        html, body {
+            width: 98%;
+            height: 98%;
+            margin: 0 1%;
+            padding: 10px 0 0 0;
+        }
+
+        #map {
+            border: solid 1px #888;
+            padding: 0;
+        }
+
+        #searchWindow {
+            position: absolute;
+            left: 80px;
+            top: 25px;
+            z-index: 999;
+            text-align: left;
+        }
+
+        #status {
+            background-color: #000;
+            color: #FFF;
+            border: solid 1px #FFF;
+            -moz-border-radius: 5px;
+            -webkit-border-radius: 5px;
+            border-radius: 5px;
+            padding: 3px;
+        }
+
+        .shadow {
+            -moz-border-radius: 6px;
+            -webkit-border-radius: 6px;
+            border-radius: 6px;
+            -moz-box-shadow: 0 6px 3px -3px #bdbdbd;
+            -webkit-box-shadow: 0 6px 3px -3px #bdbdbd;
+            box-shadow: 0 6px 3px -3px #bdbdbd;
+            background-color: #FFF;
+            padding: 8px;
+        }
+
+        #footer {
+            width: 400px;
+            padding: 10px;
+            padding-left: 50px;
+        }
+    </style>
+    <script type="text/javascript">
+        var dojoConfig = {
+            parseOnLoad: false,
+            isDebug: false,
+        };
+    </script>
+    <script type="text/javascript" src="http://js.arcgis.com/3.14/"></script>
+    <script>
+        require([
+            "esri/map",
+            "esri/domUtils",
+            "dojo/parser", "dojo/dom", "dojo/_base/url", "dojo/on",
+            "dijit/registry", "esri/dijit/Geocoder", "esri/layers/RasterLayer", "esri/layers/GraphicsLayer", "esri/layers/ArcGISDynamicMapServiceLayer", "esri/graphic", "esri/symbols/SimpleFillSymbol", "esri/geometry/Circle", 'esri/geometry/Extent', 'esri/SpatialReference',
+            "dijit/layout/BorderContainer", "dijit/layout/ContentPane",
+            "dojo/keys",
+            "dojox/charting/Chart", "dojox/charting/plot2d/Pie", "dojox/charting/themes/MiamiNice",
+            "dojox/charting/action2d/Highlight", "dojox/charting/action2d/MoveSlice", "dojox/charting/action2d/Tooltip", "dojo/_base/lang",
+            "dojo/_base/Color", "dojox/charting/widget/Legend", "dijit/form/Button", "dojo/domReady!"
+        ], function (
+                Map,
+                domUtils,
+                parser, dom, Url, on,
+                registry, Geocoder, RasterLayer, GraphicsLayer, ArcGISDynamicMapServiceLayer, Graphic, SimpleFillSymbol, Circle, Extent, SpatialReference,
+                BorderContainer, ContentPane, keys,
+                Chart, Pie, MiamiNice,
+                Highlight, MoveSlice, Tooltip, lang,
+                Color, Legend
+                ) {
+            parser.parse();
+
+            var map, isRasterLayer, geocoder, canvasSupport, indexedColormap, graphicsLayer, symbol;
+
+            canvasSupport = supports_canvas();
+            indexedColormap = new Uint8Array(256 * 4);
+
+            var isUrl = "http://sampleserver6.arcgisonline.com/arcgis/rest/services/NLCDLandCover2001/ImageServer";
+
+            var corsEnabledServers, imageServiceAuthority, onceDone;
+            imageServiceAuthority = new Url(isUrl).authority;
+            corsEnabledServers = esriConfig.defaults.io.corsEnabledServers;
+            if (!corsEnabledServers.some(function (x) {
+                return x === imageServiceAuthority;
+            })) {
+                corsEnabledServers.push(imageServiceAuthority);
+            }
+
+            var initExtent = new Extent(-2364615, 256035, 2266845, 3180435, new SpatialReference(5070));
+            map = new Map("map", {
+                extent: initExtent
+            });
+
+            isRasterLayer = new RasterLayer(isUrl, {
+                opacity: 0,
+                pixelFilter: colorize
+            });
+			
+            map.addLayer(isRasterLayer);			
+
+            graphicsLayer = new GraphicsLayer({ id: "circles" });
+            map.addLayer(graphicsLayer);
+
+            symbol = new SimpleFillSymbol().setColor(null).outline.setColor("blue");
+
+            map.on("update-start", function () {
+                domUtils.show(dom.byId("status"));
+            });
+            map.on("update-end", function () {
+                domUtils.hide(dom.byId("status"));
+            });
+
+            isRasterLayer.on("load", layerLoaded);
+            isRasterLayer.on("update-end", updatePixelBlock);
+
+            on(document, "keydown", onMapKeyDown);
+            on(document, "keyup", onMapKeyUp);
+            var moveHandle;
+
+            function onMapKeyDown(evt) {
+                switch (evt.keyCode) {
+                    case keys.ALT:
+                        map.disableMapNavigation();
+                        if (!moveHandle) {
+                            moveHandle = map.on("mouse-move", onMapMove);
+                        }
+                        break;
+                }
+            }
+            ;
+
+            function onMapKeyUp(evt) {
+                switch (evt.keyCode) {
+                    case keys.ALT:
+                        moveHandle.remove();
+                        moveHandle = null;
+                        map.enableMapNavigation();
+                        break;
+                }
+            }
+            ;
+
+            var originalPixelData;
+
+            function updatePixelBlock() {
+                originalPixelData = isRasterLayer.originalPixelData;
+            }
+            ;
+
+            var pixelValCount, noDataValue;
+
+            function onMapMove(evt) {
+                graphicsLayer.clear();
+                var currentExtent = originalPixelData.extent,
+                        pixelBlock = originalPixelData.pixelBlock,
+                        lengthX = Math.abs(currentExtent.xmax - currentExtent.xmin),
+                        lengthY = Math.abs(currentExtent.ymax - currentExtent.ymin),
+                        height = pixelBlock.height,
+                        width = pixelBlock.width,
+                        ptX = evt.mapPoint.x,
+                        ptY = evt.mapPoint.y,
+                        reqX = evt.layerX,
+                        reqY = evt.layerY,
+                        pixelSizeX = Math.abs(currentExtent.xmax - currentExtent.xmin) / map.width,
+                        bufferDim = Math.ceil(1609 * 5 / pixelSizeX), //mile
+                        xmin = (reqX - bufferDim < 0) ? 0 : reqX - bufferDim,
+                        xmax = (reqX + bufferDim > width) ? width : reqX + bufferDim,
+                        ymin = (reqY - bufferDim < 0) ? 0 : reqY - bufferDim,
+                        ymax = (reqY + bufferDim > height) ? height : reqY + bufferDim,
+                        startPixel = ymin * width + xmin,
+                        bufferlength = bufferDim * 2,
+                        pixels = pixelBlock.pixels[0],
+                        arr = [];
+
+                noDataValue = pixelBlock.statistics[0].noDataValue;
+
+                var radius2 = bufferDim * bufferDim;
+                if (bufferlength) {
+                    for (var i = 0; i <= bufferlength; i++) {
+                        for (var j = 0; j <= bufferlength; j++) {
+                            if ((Math.pow(i - bufferDim, 2) + Math.pow(j - bufferDim, 2)) <= radius2)
+                                arr.push(pixels[startPixel + i * width + j]);
+                        }
+                    }
+                } else {
+                    arr.push(pixels[startPixel]);
+                }
+
+                pixelValCount = {};
+                for (var i = 0; i < arr.length; i++) {
+                    pixelValCount[arr[i]] = 1 + (pixelValCount[arr[i]] || 0);
+                }
+                var circle = new Circle({
+                    center: evt.mapPoint,
+                    geodesic: false,
+                    radius: bufferDim * pixelSizeX
+                });
+
+                var graphic = new Graphic(circle, symbol);
+                graphicsLayer.add(graphic);
+                handleChart();
+            }
+
+            var chartTwo, legendTwo;
+
+            function handleChart() {
+                var strokes = [],
+                        totalPixels = 0;
+
+                for (var index in pixelValCount) {
+                    totalPixels += pixelValCount[index];
+                }
+
+                for (var index in pixelValCount) {
+                    if (index == noDataValue) {
+                        strokes.push({
+                            y: pixelValCount[index],
+                            legend: "NoData",
+                            text: (pixelValCount[index] / totalPixels * 100).toFixed(1) + "%",
+                            stroke: "black",
+                            tooltip: "NoData",
+                            fill: new Color([255, 255, 255])
+                        });
+                    } else {
+                        strokes.push({
+                            y: pixelValCount[index],
+                            legend: rasterATFeatures[index].ClassName,
+                            text: (pixelValCount[index] / totalPixels * 100).toFixed(1) + "%",
+                            stroke: "black",
+                            tooltip: rasterATFeatures[index].ClassName,
+                            fill: new Color([rasterATFeatures[index].Red, rasterATFeatures[index].Green, rasterATFeatures[index].Blue])
+                        });
+                    }
+                }
+
+                if (!chartTwo) {
+                    chartTwo = new Chart("chartTwo");
+                    chartTwo.setTheme(MiamiNice)
+                            .addPlot("default", {
+                                type: Pie,
+                                font: "normal normal 11pt Tahoma",
+                                fontColor: "black",
+                                labelWiring: "#1c3923",
+                                radius: 100,
+                                labelStyle: "columns",
+                                htmlLabels: true,
+                                startAngle: -10,
+                            }).addSeries("Series A", strokes);
+
+                    var anim_a = new MoveSlice(chartTwo, "default"),
+                            anim_b = new Highlight(chartTwo, "default"),
+                            anim_c = new Tooltip(chartTwo, "default");
+
+                    chartTwo.render();
+                    legendTwo = new Legend({ chart: chartTwo, horizontal: false }, "legendTwo");
+                } else {
+                    chartTwo.updateSeries("Series A", strokes);
+                    chartTwo.render();
+                    legendTwo.refresh();
+                }
+            }
+            ;
+
+            var rasterATFeatures = {};
+
+            function layerLoaded() {
+                geocoder = new Geocoder({
+                    map: map
+                }, "search");
+                geocoder.startup();
+                if (canvasSupport) {
+                    isRasterLayer.getRasterAttributeTable().then(function (response) {
+                        var data = response.features;
+                        var id = 0;
+                        for (var index in data) {
+                            rasterATFeatures[data[index].attributes.Value] = {
+                                "Blue": data[index].attributes.Blue,
+                                "ClassName": data[index].attributes.ClassName,
+                                "Green": data[index].attributes.Green,
+                                "Red": data[index].attributes.Red
+                            };
+                            id = data[index].attributes.Value * 4;
+                            indexedColormap[id] = data[index].attributes.Red;
+                            indexedColormap[id + 1] = data[index].attributes.Green;
+                            indexedColormap[id + 2] = data[index].attributes.Blue;
+                            indexedColormap[id + 3] = 255;
+                        }
+                        //isRasterLayer.setPixelFilter(colorize);
+						//now we have colormap so we redraw and turn on the visiblity
+                        isRasterLayer.redraw();
+						isRasterLayer.setOpacity(1);
+						
+                    });
+
+                    isRasterLayer.on("update-start", function () {
+                        domUtils.show(dom.byId("status"));
+                    });
+                    isRasterLayer.on("update-end", function () {
+                        domUtils.hide(dom.byId("status"));
+                    });
+
+                } else {
+                    dom.byId("welcomemsg").innerHTML = "This browser doesn't support canvas. Visit <a target='_blank' href='http://www.caniuse.com/#search=canvas'>caniuse.com</a> for supported browsers";
+                }
+            }
+
+            // The pixel filter
+            function colorize(pixelData) {                
+                if (pixelData == null || pixelData.pixelBlock == null)
+                    return;
+                var pixelBlock = pixelData.pixelBlock;
+                var pixels = pixelBlock.pixels;
+                if (pixels.length >= 3) {
+                    throw "colormap only works on single band image";
+                }
+
+                var mask = pixelBlock.mask;
+                var numPixels = pixelBlock.width * pixelBlock.height;
+                if (pixels == null)
+                    return;
+
+                var p1 = pixels[0];
+                var pr = new Uint8Array(p1.length);
+                var pg = new Uint8Array(p1.length);
+                var pb = new Uint8Array(p1.length);
+                var val = 0;
+                if (mask)
+                    for (var i = 0; i < numPixels; i++) {
+                        if (mask[i]) {
+                            pr[i] = indexedColormap[p1[i] * 4];
+                            pg[i] = indexedColormap[p1[i] * 4 + 1];
+                            pb[i] = indexedColormap[p1[i] * 4 + 2];
+                            //mask[i] = indexedColormap[p1[i]*4+3];
+                        }
+                    }
+                else {
+                    for (var i = 0; i < numPixels; i++) {
+                        pr[i] = indexedColormap[p1[i] * 4];
+                        pg[i] = indexedColormap[p1[i] * 4 + 1];
+                        pb[i] = indexedColormap[p1[i] * 4 + 2];
+                    }
+                }
+
+                pixelData.pixelBlock.pixels = [pr, pg, pb];
+                //for U8 type, you don't need to worry about statistics, as raster layer draw pixel as is
+                pixelData.pixelBlock.statistics = null; 
+                pixelData.pixelBlock.pixelType = "U8";
+                return pixelData;
+            }
+
+            // does the browser support canvas?
+            function supports_canvas() {
+                return !!document.createElement("canvas").getContext('2d');
+            }
+        });
+    </script>
+</head>
+<body class="claro">
+    <div data-dojo-type="dijit/layout/BorderContainer" data-dojo-props="design:'headline', gutters:false"
+         style="width: 100%; height: 100%; margin: 0;">
+        <div id="map" class='shadow' data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region:'center'"
+             style="height: 100%;">
+            <div id="searchWindow"><div id="search"></div></div>
+            <div id="status" style="position: absolute; right: 10px; bottom: 10px; z-index: 99;">
+                Loading...
+            </div>
+        </div>
+        <div id="footer" data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region:'right'">
+            <div style="margin: 0 auto;">
+                <span style='font-weight: 600; font-size:1.2em' id='elevSpan'><b>Land Cover Composition in 5 Miles Radius</b></span>
+                <div id="welcomemsg">
+                    <p style='font-size:1.1em'>
+                        This app dynamically generates land cover composition within a 5 mile radius. Hold the ALT key and hover the cursor on the map using the mouse. Move the mouse around while holding the ALT key to get live updates. Release the ALT key to go back to navigation mode.
+                    </p>
+                </div>
+                <div id="chartTwo" style="width: 350px; height: 350px;"></div>
+                <div id="legendTwo"></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

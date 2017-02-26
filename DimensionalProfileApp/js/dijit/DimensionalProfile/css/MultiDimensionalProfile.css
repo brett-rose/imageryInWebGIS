@@ -1,0 +1,62 @@
+.esriMultiDimensionalChart {
+    height: 100%;
+    width: 100%;
+    min-height: 200px;
+    margin: 0 auto 0 auto;
+    overflow: hidden;
+}
+
+/*.esriMultiDimensionalChart .esriChartTitleFont {
+    font-stretch: normal;
+    font-variant: normal;
+    font-weight: bold;
+    font-size: 13pt;
+    font-family: Verdana;
+    color: #eee;
+}
+
+.esriMultiDimensionalChart .esriAxisTitleFontSize {
+    font-stretch: normal;
+    font-variant: normal;
+    font-weight: bold;
+    font-size: 11pt;
+    font-family: Verdana;
+}
+
+.esriMultiDimensionalChart .esriAxisLabelFontSize {
+    font-stretch: normal;
+    font-variant: normal;
+    font-weight: bold;
+    font-size: 9pt;
+    font-family: Verdana;
+}
+.esriMultiDimensionalChart .esriIndicatorFontColor {
+    color: #eee;
+}
+.esriMultiDimensionalChart .esriIndicatorFillColor {
+    color: #666
+}
+.esriMultiDimensionalChart .esriTitleFontColor {
+    color: #eee
+}
+.esriMultiDimensionalChart .esriAxisFontColor {
+    color: #ccc
+}
+.esriMultiDimensionalChart .esriAxisMajorTickColor {
+    color: #333
+}
+.esriMultiDimensionalChart .esriSkyTopColor {
+    color: #B0E0E6
+}
+.esriMultiDimensionalChart .esriSkyBottomColor {
+    color: #4682B4
+}
+.esriMultiDimensionalChart .esriProfileLineColor {
+    color: #D2B48C
+}
+.esriMultiDimensionalChart .esriProfileTopColor {
+    color: #8B4513
+}
+.esriMultiDimensionalChart .esriProfileBottomColor {
+    color: #CD853F
+}*/

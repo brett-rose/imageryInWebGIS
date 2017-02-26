@@ -1,0 +1,146 @@
+﻿<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+        <!--The viewport meta tag is used to improve the presentation and behavior of the samples 
+          on iOS devices-->
+        <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no">
+        <title>Image Service Layer with Measure</title>
+    <link rel="stylesheet" href="http://js.arcgis.com/3.14/dijit/themes/claro/claro.css">
+    <link rel="stylesheet" href="http://js.arcgis.com/3.14/esri/css/esri.css">
+        <style>     
+            html, body {
+                width: 98%;
+                height: 98%;
+                margin: 0 1%;
+                padding: 10px 0 0 0;        
+            }
+
+            #map
+            {
+                border: solid 1px #888;
+                padding: 0;
+            }      
+
+            #status
+            {
+                background-color: #000;
+                color: #FFF;
+                border: solid 1px #FFF;
+                -moz-border-radius: 5px;
+                -webkit-border-radius: 5px;
+                border-radius: 5px;
+                padding: 3px;
+            }
+
+            .shadow
+            {
+                -moz-border-radius: 6px;
+                -webkit-border-radius: 6px;
+                border-radius: 6px;
+                -moz-box-shadow: 0 6px 3px -3px #bdbdbd;
+                -webkit-box-shadow: 0 6px 3px -3px #bdbdbd;
+                box-shadow: 0 6px 3px -3px #bdbdbd;
+                background-color: #FFF;
+                padding: 8px;
+            }
+            
+            #measureWidget {
+                position: absolute; 
+                top: 10px; 
+                right: 50px; 
+                z-index: 99;
+            }
+        </style>
+        <script type="text/javascript">
+            var dojoConfig = {
+                async: true,
+                isDebug: true
+            };
+        </script>         
+        <script type="text/javascript" src="http://js.arcgis.com/3.14"></script>
+        <script>
+
+            require([
+                "esri/map",
+                "esri/domUtils", "dojo/_base/url", "dojo/on",
+                "esri/layers/RasterLayer","esri/layers/ImageServiceParameters",
+                "dijit/layout/BorderContainer", "dijit/layout/ContentPane",
+                "dojo/parser", "dojo/dom", "esri/dijit/ImageServiceMeasure", "dojo/domReady!"
+            ], function (
+                    Map,
+                    domUtils, Url, on,
+                    RasterLayer,ImageServiceParameters,
+                    BorderContainer, ContentPane,
+                    parser, dom, ImageServiceMeasure)
+            {
+                parser.parse();
+
+                var map, imageServiceLayer;
+
+                function getParameter(name) {
+                    name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+                    var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+                            results = regex.exec(location.search);
+                    return results == null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+                }
+
+                var isUrl = getParameter("isUrl") ? getParameter("isUrl") : "http://sampleserver6.arcgisonline.com/arcgis/rest/services/Toronto/ImageServer";
+
+                var corsEnabledServers, imageServiceAuthority, onceDone;
+                imageServiceAuthority = new Url(isUrl).authority;
+                corsEnabledServers = esriConfig.defaults.io.corsEnabledServers;
+                if (!corsEnabledServers.some(function (x) {
+                    return x === imageServiceAuthority;
+                })) {
+                    corsEnabledServers.push(imageServiceAuthority);
+                }
+
+                map = new Map("map", {
+                    basemap: "topo"
+                });
+
+                map.on("update-start", function () {
+                    domUtils.show(dom.byId("status"));
+                });
+                map.on("update-end", function () {
+                    domUtils.hide(dom.byId("status"));
+                });
+
+				var isparams = new ImageServiceParameters();
+                isparams.format = "jpgpng";
+                isparams.bandIds = isUrl.indexOf("Landsat")>0? [3, 2, 1]:null;
+				
+                imageServiceLayer = new RasterLayer(isUrl,{
+                        imageServiceParameters: isparams
+                    });
+
+                imageServiceLayer.on("load", function (args) {
+                    map.setExtent(imageServiceLayer.extent);
+                        var mdFilter = new ImageServiceMeasure({
+                            layer: imageServiceLayer,
+                            map: map
+                        }, "measureWidget");
+                        mdFilter.startup();
+                });
+
+                map.addLayer(imageServiceLayer);
+            });
+        </script>
+    </head>
+
+    <body class="claro">
+        <div data-dojo-type="dijit/layout/BorderContainer" id="mdborder" data-dojo-props="design:'headline', gutters:true"
+             style="width: 100%; height: 100%; margin: 0;">
+            <div id="map" class='shadow' data-dojo-type="dijit/layout/ContentPane" data-dojo-props="region:'center'"
+                 style="height: 100%;">
+                <div id="measureWidget">
+                </div>
+                <div id="status" style="position: absolute; right: 10px; bottom: 10px; z-index: 99;">
+                    Loading...
+                </div>
+            </div>
+        </div>
+    </body>
+
+</html>

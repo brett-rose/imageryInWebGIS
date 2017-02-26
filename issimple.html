@@ -1,0 +1,151 @@
+﻿<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>Image Service 101</title>
+  <link rel="stylesheet" href="http://js.arcgis.com/3.17/dijit/themes/claro/claro.css">
+  <link rel="stylesheet" href="http://js.arcgis.com/3.17/esri/css/esri.css">
+  <style>
+    html, body {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    /*rounded
+             corners and opacity not supported in all browsers*/
+    .shadow {
+      padding: 8px;
+      -moz-border-radius: 6px;
+      -webkit-border-radius: 6px;
+      -moz-box-shadow: 0px 6px 3px -3px #888;
+      -webkit-box-shadow: 0px 6px 3px -3px #888;
+      box-shadow: 0px 6px 3px -3px #888;
+      background-color: white;
+    }
+
+    #searchWindow {
+      position: absolute;
+      left: 80px;
+      top: 25px;
+      z-index: 999;
+      text-align: left;
+    }
+
+    #floatingWindow {
+      position: absolute;
+      right: 25px;
+      top: 15px;
+      z-index: 998;
+      width: 260px;
+      -moz-border-radius: 10px;
+      -webkit-border-radius: 10px;
+      border: solid 3px #028482;
+      color: #000000;
+      padding: 10px;
+      font-family: "Tahoma";
+      text-align: left;
+    }
+
+    #title {
+      padding-left: 10px;
+    }
+
+
+    .collapse {
+      display: none;
+    }
+  </style>
+  <script type="text/javascript">
+    var djConfig = {
+      parseOnLoad: false
+    };
+  </script>
+  <script type="text/javascript" src="//js.arcgis.com/3.17/">
+  </script>
+  <script type="text/javascript">
+    var imageServiceLayer, map, zoomTo;
+    require(["dojo/parser", "dojo/dom-class",
+        "dojo/ready",
+        "esri/map", "esri/IdentityManager", "esri/dijit/Geocoder", "esri/layers/ArcGISTiledMapServiceLayer", "esri/layers/ArcGISImageServiceLayer",
+  "esri/layers/RasterFunction", "esri/layers/ImageServiceParameters", "esri/layers/MosaicRule",
+    "esri/geometry/Extent", "esri/SpatialReference",
+    "dijit/form/RadioButton",
+    "dijit/form/CheckBox",
+    "dijit/form/TextBox",
+    "dijit/form/Button",
+    "dijit/layout/BorderContainer",
+    "dijit/layout/ContentPane",
+    "dijit/ProgressBar",
+    "dijit/form/HorizontalSlider", "dijit/form/HorizontalRule", "dijit/form/HorizontalRuleLabels", "dojox/form/RangeSlider", "dojox/gauges/GlossyCircularGauge", "dojo/on", "dojo/dom", "dijit/registry", "dojox/charting/widget/Chart2D", "dojox/charting/themes/Claro", "dojo/domReady!"
+    ], function (parser, domClass, ready, Map, esriId, Geocoder, ArcGISTiledMapServiceLayer, ArcGISImageServiceLayer, RasterFunction, ImageServiceParameters, MosaicRule,
+Extent, SpatialReference, RadioButton, CheckBox, TextBox, Button, BorderContainer, ContentPane, ProgressBar, HorizontalSlider, HorizontalRule, HorizontalRuleLabels, RangeSlider, GlossyCircularGauge, on, dom, registry, Chart2D, Claro) {
+      parser.parse();
+      //16116 29859
+      esri.config.defaults.io.corsEnabledServers.push("http://localhost:6080");
+      esri.config.defaults.io.corsEnabledServers.push("http://sampleserver6.arcgisonline.com");
+      esri.config.defaults.io.corsEnabledServers.push("http://landsat.arcgis.com");
+      var worldExtent = new Extent(-18299042.112232726, -5843983.938206653, 15533821.095456108, 10964824.329812262, new SpatialReference(3857));
+      var torontoExtent = new Extent(-8871156.887999881, 5395849.535498785, -8805077.077047433, 5428679.2391472235, new SpatialReference(3857));
+      
+
+      map = new Map("map", {
+        wrapAround180: true,
+        extent: worldExtent,
+      });
+      var basemap = new ArcGISTiledMapServiceLayer("http://imagery.arcgisonline.com/arcgis/rest/services/LandsatGLS/LandsatShadedBasemap/ImageServer");
+      map.addLayer(basemap);
+      var mosaicRule = new MosaicRule(
+                  {
+                    "method": "esriMosaicCenter"
+                  });
+      var params = new ImageServiceParameters();
+      params.bandIds = [3, 2, 1];//0 based index
+      params.mosaicRule = mosaicRule;
+      params.format = "jpgpng";
+      var rasterFunction = new RasterFunction();
+      var arguments = {};
+
+      var isUrl = "http://sampleserver6.arcgisonline.com/arcgis/rest/services/Toronto/ImageServer";
+      imageServiceLayer = new ArcGISImageServiceLayer(isUrl, { imageServiceParameters: params });
+      map.addLayer(imageServiceLayer);
+
+      var geocoder = new Geocoder({
+        map: map
+      }, "search");
+      geocoder.startup();
+
+
+      zoomTo = function (val) {
+        if (val === "Toronto")
+          map.setExtent(torontoExtent);
+        else
+          map.setExtent(worldExtent);
+      };
+
+
+    });
+  </script>
+</head>
+<body class="claro">
+  <div dojotype="dijit/layout/BorderContainer" design="headline" gutters="false" style="width: 100%; height: 100%; margin: 0;">
+    <div id="map" dojotype="dijit/layout/ContentPane" region="center" style="overflow:hidden;position:relative;">
+      <div id="map_draw_status" class="collapse">
+        <div data-dojo-type="dijit/ProgressBar" data-dojo-props='indeterminate:"true", label: "loading...", style:"width:100px"'></div>
+      </div>
+      <div id="searchWindow"><div id="search"></div></div>
+      <div id="floatingWindow">
+        <div class="shadow">
+          <div id="title">
+            <span>This app shows how to access tiled and dynamic image services.</span>
+          </div>
+          <button data-dojo-type="dijit/form/Button" data-dojo-id="analysis" onclick="zoomTo('Toronto');" type="button">Toronto</button>
+          <button data-dojo-type="dijit/form/Button" data-dojo-id="analysis" onclick="zoomTo('World');" type="button">World</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

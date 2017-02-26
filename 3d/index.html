@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>Add an ArcGISImageLayer to a map - 4.0</title>
+
+  <link rel="stylesheet" href="https://js.arcgis.com/4.0/esri/css/main.css">
+  <link rel="stylesheet" href="https://js.arcgis.com/4.0/esri/dijit/themes/claro/claro.css">
+  <script src="https://js.arcgis.com/4.0/"></script>
+  
+  <style>
+    html, body, #viewDiv {
+      padding: 0;
+      margin: 0;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+
+  <script>
+    var dojoConfig = {
+      async: true,
+      isDebug: true
+    };
+  </script>
+
+  <script src="./dat.gui.js"></script>
+  <script>
+    require([
+      "esri/Map",
+
+      "esri/views/SceneView",
+
+      "esri/layers/ImageryLayer",
+      "esri/layers/support/RasterFunction",
+      "dojo/domReady!"
+    ],
+    function(
+      Map,
+      SceneView,
+      ArcGISImageLayer, RasterFunction
+    ) {
+
+      currentMin = 10;
+      currentMax = 20;
+
+      /******************************************
+       * Set the rendering rule to the 
+       * "None" raster function. This will allow
+       * us to gain access to the temperature 
+       * value assigned to each pixel
+       *****************************************/
+
+      var rf = new RasterFunction({
+        functionName: "None"
+      });
+
+      /**********************************************************
+       * The PixelFilter. This function is used to color the 
+       * pixels. By default, each pixel has one band containing
+       * a temperature value. Without the pixelFilter
+       * the layer would render in a grayscale. We will
+       * replace the single band with three bands - red,
+       * green, and blue to give color to the layer. This 
+       * will overwrite the original temperature value. See
+       * the getTemp() function for converting the RGB values
+       * back to the original temperature value.
+       *********************************************************/
+
+      function colorize(pixelData) {
+        if (pixelData === null || pixelData.pixelBlock === null ||
+          pixelData.pixelBlock.pixels === null) {
+          return;
+        }
+
+        //The pixelBlock stores the values of all pixels visible in the view    
+        var pixelBlock = pixelData.pixelBlock;
+
+        //Get the min and max values of the data in the current view    
+        var minValue = pixelBlock.statistics[0].minValue;
+        var maxValue = pixelBlock.statistics[0].maxValue;
+
+        //The mask is an array that determines which pixels are visible to the client      
+        var mask = pixelBlock.mask;
+
+        //The pixels visible in the view    
+        var pixels = pixelBlock.pixels;
+
+        //The number of pixels in the pixelBlock    
+        var numPixels = pixelBlock.width * pixelBlock.height;
+
+        //Calculate the factor by which to determine the red and blue 
+        //values in the colorized version of the layer
+        var factor = 255.0 / (maxValue - minValue);
+
+        //Get the pixels containing temperature values in the only band of the data    
+        var band1 = pixels[0];
+
+        //Create empty arrays for each of the RGB bands to set on the pixelBlock    
+        var rBand = [];
+        var gBand = [];
+        var bBand = [];
+
+        //Loop through all the pixels in the view    
+        for (i = 0; i < numPixels; i++) {
+          //Get the pixel value (the temperature) recorded at the pixel location   
+          var tempValue = band1[i];
+
+          // Update the mask
+          mask[i] = tempValue >= rasterOptions.minValue;// && tempValue <= currentMax ? 1 : 0;
+          
+          //Calculate the red value based on the factor   
+          var red = (tempValue - minValue) * factor;
+
+          //Sets a color between blue (coldest) and red (warmest) in each band
+          rBand[i] = red;
+          gBand[i] = 0;
+          bBand[i] = 255 - red;
+        }
+
+        //Set the new pixel values on the pixelBlock    
+        pixelData.pixelBlock.pixels = [rBand, gBand, bBand];
+        pixelData.pixelBlock.pixelType = "U8"; //U8 is used for color
+
+        //returns the data to the layer
+        return pixelData;
+      }
+
+      /********************
+       * Create image layer
+       ********************/
+
+      layer = new ArcGISImageLayer({
+        url: "https://sampleserver6.arcgisonline.com/arcgis/rest/services/ScientificData/SeaTemperature/ImageServer",
+        renderingRule: rf,
+        pixelFilter: colorize
+      });
+
+      /**************************
+       * Add image layer to map
+       *************************/
+
+      var map = new Map({
+        basemap: "dark-gray",
+        layers: [layer]
+      });
+
+      view = new SceneView({
+        container: "viewDiv",
+        map: map
+      });
+
+      /**************************
+       * Add image layer to map
+       *************************/
+      var rasterOptions = {
+        minValue: -3,
+        previousValue: -3
+      };
+      var gui = new dat.GUI();
+      var controller = gui.add(rasterOptions, 'minValue', -3, 37);
+      controller.__step = 1;
+      controller.onChange(function(value) {
+        if (value !== rasterOptions.previousValue) {
+          rasterOptions.previousValue = value;
+          layer.redraw();
+        }
+      });
+    });
+  </script>
+</head>
+
+<body class="claro">
+  <div id="viewDiv"></div>
+</body>
+
+</html>

@@ -1,0 +1,397 @@
+﻿<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>Avalanche Analysis</title>
+  <link rel="stylesheet" href="http://js.arcgis.com/3.14/dijit/themes/claro/claro.css">
+  <link rel="stylesheet" href="http://js.arcgis.com/3.14/esri/css/esri.css">
+  <style>
+    html, body {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    /*rounded
+             corners and opacity not supported in all browsers*/
+    .shadow {
+      padding: 8px;
+      -moz-border-radius: 6px;
+      -webkit-border-radius: 6px;
+      -moz-box-shadow: 0px 6px 3px -3px #888;
+      -webkit-box-shadow: 0px 6px 3px -3px #888;
+      box-shadow: 0px 6px 3px -3px #888;
+      background-color: white;
+    }
+
+    #searchWindow {
+      position: absolute;
+      left: 80px;
+      top: 25px;
+      z-index: 999;
+      text-align: left;
+    }
+
+    #floatingWindow {
+      position: absolute;
+      right: 25px;
+      top: 15px;
+      z-index: 998;
+      width: 260px;
+      -moz-border-radius: 10px;
+      -webkit-border-radius: 10px;      
+      border: solid 3px #028482;
+      color: #000000;
+      padding: 10px;
+      font-family: "Tahoma";
+      color: black;
+      text-align: left;
+    }
+
+    #title {
+      font-size: 12pt;
+      padding-left: 10px;
+    }
+
+    #description {
+      font-size: 12pt;
+      padding-left: 10px;
+    }
+
+    #servicepicker {
+      font-size: 8pt;
+      padding-left: 10px;
+    }
+
+    #divbasicFeatures {
+      font-size: 8pt;
+      padding: 10px;
+    }
+
+    #elevationSlider {
+      font-size: 8pt;
+      padding: 10px;
+    }
+
+    #transparencySlider {
+      font-size: 8pt;
+      padding: 10px;
+    }
+
+    #divrasterfunctions {
+      font-size: 8pt;
+      padding: 10px;
+    }
+
+    .disabled {
+      color: #808080;
+      !important;
+    }
+  </style>
+  <script type="text/javascript">
+    var djConfig = {
+      parseOnLoad: false
+    };
+  </script>
+  <script type="text/javascript" src="http://js.arcgis.com/3.14/">
+  </script>
+  <script type="text/javascript">
+    var imageServiceLayer, map, geocoder, params;
+    var slopeRange = 90;
+    require(["dojo/parser",
+        "dojo/ready",
+        "esri/map", "esri/IdentityManager",
+  "esri/dijit/Geocoder", "esri/layers/ArcGISTiledMapServiceLayer", "esri/layers/ArcGISImageServiceLayer",
+  "esri/layers/RasterFunction", "esri/layers/ImageServiceParameters", "esri/layers/MosaicRule",
+    "esri/geometry/Extent", "esri/SpatialReference",
+    "dijit/form/RadioButton",
+    "dijit/form/CheckBox",
+    "dijit/form/TextBox",
+    "dijit/form/Button",
+    "dijit/layout/BorderContainer",
+    "dijit/layout/ContentPane",
+    "dijit/form/HorizontalSlider", "dijit/form/HorizontalRule", "dijit/form/HorizontalRuleLabels", "dojox/form/RangeSlider", "dojox/gauges/GlossyCircularGauge", "dojo/on", "dojo/dom", "dijit/registry", "dojox/charting/widget/Chart2D", "dojox/charting/themes/Claro", "dojo/domReady!"
+    ], function (parser, ready, Map, esriId, Geocoder, ArcGISTiledMapServiceLayer, ArcGISImageServiceLayer, RasterFunction, ImageServiceParameters, MosaicRule,
+Extent, SpatialReference, RadioButton, CheckBox, TextBox, Button, BorderContainer, ContentPane, HorizontalSlider, HorizontalRule, HorizontalRuleLabels, RangeSlider, GlossyCircularGauge, on, dom, registry, Chart2D, Claro) {
+      ready(function () {
+        parser.parse();
+        esri.config.defaults.io.corsEnabledServers.push("http://localhost:6080");
+        esri.config.defaults.io.corsEnabledServers.push("http://sampleserver6.arcgisonline.com");
+        esri.config.defaults.io.corsEnabledServers.push("http://elevation.arcgis.com");
+        var initExtent = new Extent(-13023319.666519351, 4057118.7987916414, -13005720.040756714, 4066081.0403580666, new SpatialReference(3857));
+        var baseUrl = "http://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer";
+
+        //This world elevation service is secured, you need to use an organization account to access
+        var isUrl = "http://elevation.arcgis.com/arcgis/rest/services/WorldElevation/Terrain/ImageServer";
+
+        map = new Map("map", {
+          wrapAround180: true,
+          extent: initExtent,
+        });
+        var basemap = new ArcGISTiledMapServiceLayer(baseUrl);
+        map.addLayer(basemap);
+        var params = new ImageServiceParameters();
+        //params.bandIds = [3,2,1];//natural color
+
+        var rasterFunction = new RasterFunction();
+        var arguments = {};
+        var mosaicRule = new MosaicRule(
+                    {
+                      "method": "esriMosaicAttribute",
+                      "sortField": "StdTime",
+                      "sortValue": "3000/12/31",
+                      "ascending": true,
+                      "mosaicOperation": "MT_FIRST",
+                      "where": "GroupName='2100'",
+                    }
+                    );
+
+        imageServiceLayer = new ArcGISImageServiceLayer(isUrl, { imageServiceParameters: params });
+        imageServiceLayer.setUseMapTime(true);
+        imageServiceLayer.setOpacity(1);
+        map.addLayer(imageServiceLayer);
+
+        geocoder = new Geocoder({
+          map: map
+        }, "search");
+        geocoder.startup();
+      });
+    });
+
+
+    function changeElevationLabel(val) {
+      //document.getElementById("elevationLabel").innerHTML="Elevation: "+val[0].toFixed(0)+"-"+val[1].toFixed(0);
+      dijit.byId("elevationLower").set("value", val[0].toFixed(0));
+      dijit.byId("elevationUpper").set("value", val[1].toFixed(0));
+    }
+    function changeElevationSlider(val, ind) {
+      //document.getElementById("elevationLabel").innerHTML="Elevation: "+val[0].toFixed(0)+"-"+val[1].toFixed(0);
+      var old = dijit.byId("elevationSlider").value;
+      if (ind == 0)
+        dijit.byId("elevationSlider").set("value", [parseInt(parseFloat(val).toFixed(0)), old[1]]);
+      else
+        dijit.byId("elevationSlider").set("value", [old[0], parseInt(parseFloat(val).toFixed(0))]);
+    }
+    function changeSlopeSlider(val, ind) {
+      //document.getElementById("SlopeLabel").innerHTML="Slope: "+val[0].toFixed(0)+"-"+val[1].toFixed(0);
+      var old = dijit.byId("slopeSlider").value;
+      if (ind == 0)
+        dijit.byId("slopeSlider").set("value", [parseInt(parseFloat(val).toFixed(0)), old[1]]);
+      else
+        dijit.byId("slopeSlider").set("value", [old[0], parseInt(parseFloat(val).toFixed(0))]);
+    }
+    function changeAspectGauge() {
+      //document.getElementById("SlopeLabel").innerHTML="Slope: "+val[0].toFixed(0)+"-"+val[1].toFixed(0);
+      /*
+      var old1 = parseInt(dijit.byId("aspectLower").value);
+      var old2 = parseInt(dijit.byId("aspectUpper").value);
+      if (old2>old1)
+      {
+      slopeRange = 45;//old2-old1;
+      dijit.byId("aspectGauge").set("value",parseInt((old1+old2)/2));
+      }
+      else
+      {
+      slopeRange = 45;//old2+360-old1;
+      var temp = parseInt((old1+old2+360)/2);
+      if (temp>360)
+      temp-=360;
+      dijit.byId("aspectGauge").set("value",temp);
+      }
+      qualityflag = true;
+      */
+    }
+    function changeSlopeLabel(val) {
+      //document.getElementById("slopeLabel").innerHTML="Slope: "+val[0].toFixed(0)+"-"+val[1].toFixed(0);
+      dijit.byId("slopeLower").set("value", val[0].toFixed(0));
+      dijit.byId("slopeUpper").set("value", val[1].toFixed(0));
+    }
+    function changeAspectLabel(val) {
+      //document.getElementById("aspectLabel").innerHTML="Aspect: "+val[0].toFixed(0)+"-"+val[1].toFixed(0);
+      var lower = parseInt((val - slopeRange / 2).toFixed(0));
+      if (lower < 0)
+        lower += 360;
+      var upper = lower + slopeRange;
+      if (upper > 360)
+        upper -= 360;
+      dijit.byId("aspectLower").set("value", lower);
+      dijit.byId("aspectUpper").set("value", upper);
+    }
+    function changeRFT() {
+
+
+      //get threshold values
+      var threshold_elevation = dijit.byId("elevationSlider").value;
+      var threshold_slope = dijit.byId("slopeSlider").value;
+      var threshold_aspect = [parseInt(dijit.byId("aspectLower").value), parseInt(dijit.byId("aspectUpper").value)]
+
+
+      //building a function chain
+      //build evaluation lower threshold function
+      var elevationLowerThresholdFunc = {};
+      elevationLowerThresholdFunc.rasterFunction = "Local";
+      elevationLowerThresholdFunc.rasterFunctionArguments = {
+        "Operation": 29,//greater than equal
+        "Rasters": ["$$", parseInt(threshold_elevation[0].toFixed(0))]
+      };
+      //build evaluation upper threshold function
+      var elevationUpperThresholdFunc = {};
+      elevationUpperThresholdFunc.rasterFunction = "Local";
+      elevationUpperThresholdFunc.rasterFunctionArguments = {
+        "Operation": 34,//less than equal
+        "Rasters": ["$$", parseInt(threshold_elevation[1].toFixed(0))]
+      };
+      //build evaluation threshold function
+      var elevationThresholdFunc = {};
+      elevationThresholdFunc.rasterFunction = "Local";
+      elevationThresholdFunc.rasterFunctionArguments = {
+        "Operation": 17,//boolean and
+        "Rasters": [elevationLowerThresholdFunc, elevationUpperThresholdFunc]
+      };
+      //build slope function
+      var slopeFunction = {};
+      slopeFunction.rasterFunction = "Slope";
+
+      //build slope lower threshold function
+      var slopeLowerThresholdFunc = {};
+      slopeLowerThresholdFunc.rasterFunction = "Local";
+      slopeLowerThresholdFunc.rasterFunctionArguments = {
+        "Operation": 29,//greater than equal
+        "Rasters": [slopeFunction, parseInt(threshold_slope[0].toFixed(0))]
+      }
+      //build slope lower threshold function
+      var slopeUpperThresholdFunc = {};
+      slopeUpperThresholdFunc.rasterFunction = "Local";
+      slopeUpperThresholdFunc.rasterFunctionArguments = {
+        "Operation": 34,//less than equal
+        "Rasters": [slopeFunction, parseInt(threshold_slope[1].toFixed(0))]
+      }
+      //build slope threshold function
+      var slopeThresholdFunc = {};
+      slopeThresholdFunc.rasterFunction = "Local";
+      slopeThresholdFunc.rasterFunctionArguments = {
+        "Operation": 17,//boolean and
+        "Rasters": [slopeLowerThresholdFunc, slopeUpperThresholdFunc]
+      };
+      //build aspect function
+      var aspectFunction = {};
+      aspectFunction.rasterFunction = "Aspect";
+
+      //build aspect lower threshold function
+      var aspectLowerThresholdFunc = {};
+      aspectLowerThresholdFunc.rasterFunction = "Local";
+      aspectLowerThresholdFunc.rasterFunctionArguments = {
+        "Operation": 29,//greater than equal
+        "Rasters": [aspectFunction, parseInt(threshold_aspect[0].toFixed(0))]
+      };
+      //build aspect upper threshold function
+      var aspectUpperThresholdFunc = {};
+      aspectUpperThresholdFunc.rasterFunction = "Local";
+      aspectUpperThresholdFunc.rasterFunctionArguments = {
+        "Operation": 34,//less than equal
+        "Rasters": [aspectFunction, parseInt(threshold_aspect[1].toFixed(0))]
+      };
+      //build aspect threshold function
+      var aspectThresholdFunc = {};
+      aspectThresholdFunc.rasterFunction = "Local";
+      aspectThresholdFunc.rasterFunctionArguments = {
+        "Operation": threshold_aspect[0] < threshold_aspect[1] ? 17 : 19,//boolean and 17 boolean or 19
+        "Rasters": [aspectLowerThresholdFunc, aspectUpperThresholdFunc]
+      };
+      //build threshold function (meet all conditions = 3)
+      var sumThresholdFunction = {};
+      sumThresholdFunction.rasterFunction = "Local";
+      sumThresholdFunction.rasterFunctionArguments = {
+        "Operation": 55, //sum
+        "Rasters": [elevationThresholdFunc, slopeThresholdFunc, aspectThresholdFunc]
+      };
+
+      //sumThresholdFunction is a chain, and it's the Raster of the final colormap function. go to JS API now.
+      var clormapFunction = new esri.layers.RasterFunction();
+      var clrArgs = {};
+      var colormap = [[3, 255, 0, 0]];
+      clrArgs.Colormap = colormap;
+      clrArgs.Raster = sumThresholdFunction;
+      clormapFunction.arguments = clrArgs;
+      clormapFunction.functionName = "Colormap";
+      imageServiceLayer.setRenderingRule(clormapFunction);
+      imageServiceLayer.setOpacity(1);
+    }
+    function changeTransparency(val) {
+      document.getElementById("transparencyLabel").innerHTML = "Transparency :" + val.toFixed(0);
+      imageServiceLayer.setOpacity(1 - parseInt(val.toFixed(0)) / 100);
+    }
+  </script>
+</head>
+<body class="claro">
+  <div dojotype="dijit.layout.BorderContainer" design="headline" gutters="false" style="width: 100%; height: 100%; margin: 0;">
+    <div id="map" dojotype="dijit.layout.ContentPane" region="center" style="overflow:hidden;position:relative;">
+      <div id="searchWindow"><div id="search"></div></div>
+      <div id="floatingWindow">
+        <div class="shadow">
+          <div id="title">
+            <label>Interactive Avalanche Analysis</label>
+          </div>
+          <div id="divbasicFeatures">
+            <br />
+            <label style="font-size: 11pt;">Analyze avalanche risks based on elevation, slope, and aspect.</label>
+            <br>
+            <br>
+            <label id="elevationLabel">
+              Elevation (m):
+            </label>
+            <input type="text" value="1000" onchange="changeElevationSlider(this.value,0);" style="width: 3em; vertical-align: middle;" data-dojo-type="dijit/form/TextBox" id="elevationLower" />&nbsp; &#8212;&nbsp;
+            <input type="text" value="5000" onchange="changeElevationSlider(this.value,1);" style="width: 3em; vertical-align: middle;" data-dojo-type="dijit/form/TextBox" id="elevationUpper" />
+
+            <br>
+            <div id="elevationSlider" dojotype="dojox.form.HorizontalRangeSlider" onmousemove="changeElevationLabel(this.value);" onclick="changeElevationLabel(this.value);" value="1000,5000" maximum="8848" discretevalues="8849" minimum="0" pageincrement="1" showbuttons="true" intermediatechanges="false" slideduration="500">
+              <div data-dojo-type="dijit/form/HorizontalRule" data-dojo-props='container:"bottomDecoration", count:5, style:{height:"5px"}'></div>
+              <ol data-dojo-type="dijit/form/HorizontalRuleLabels" data-dojo-props='container:"bottomDecoration", style:{height:"1em",fontSize:"90%"}'>
+                <li>0</li>
+                <li>8848</li>
+              </ol>
+            </div>
+            <br>
+            <label id="slopeLabel">
+              Slope (&deg;):&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            </label>
+            <input type="text" value="20" onchange="changeSlopeSlider(this.value,0);" style="width: 3em; vertical-align: middle;" data-dojo-type="dijit/form/TextBox" id="slopeLower" />&nbsp; &#8212;&nbsp;
+            <input type="text" value="60" onchange="changeSlopeSlider(this.value,1);" style="width: 3em; vertical-align: middle;" data-dojo-type="dijit/form/TextBox" id="slopeUpper" />
+            <br>
+            <div id="slopeSlider" dojotype="dojox.form.HorizontalRangeSlider" onmousemove="changeSlopeLabel(this.value);" onchange="changeSlopeLabel(this.value);" value="20,60" maximum="90" minimum="0" discretevalues="91" pageincrement="1" showbuttons="true" intermediatechanges="false" slideduration="500">
+              <div data-dojo-type="dijit/form/HorizontalRule" data-dojo-props='container:"bottomDecoration", count:5, style:{height:"5px"}'></div>
+              <ol data-dojo-type="dijit/form/HorizontalRuleLabels" data-dojo-props='container:"bottomDecoration", style:{height:"1em",fontSize:"90%"}'>
+                <li>0</li>
+                <li>90</li>
+              </ol>
+            </div>
+            <br />
+            <label id="aspectLabel">
+              Aspect (&deg;):&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            </label>
+            <input type="text" value="0" onchange="changeAspectGauge();" style="width: 3em; vertical-align: middle;" data-dojo-type="dijit/form/TextBox" id="aspectLower" />&nbsp; &#8212;&nbsp;
+            <input type="text" value="90" onchange="changeAspectGauge();" style="width: 3em; vertical-align: middle;" data-dojo-type="dijit/form/TextBox" id="aspectUpper" />
+            <br>
+            <div id="aspectGauge" data-dojo-type="dojox/gauges/GlossyCircularGauge" onvaluechanged="changeAspectLabel(this.value);" background="[255, 255, 255, 0]" title="Value" value="45" width="150" height="150" textindicatorfont:"normal small-caps bold 14pt arial", min="0" max="360" startangle="0" endangle="360" majorticksinterval="45"></div>
+            <br />
+            <label id="transparencyLabel">
+              Transparency:0
+            </label>
+            <div id="transparencySlider" dojotype="dijit.form.HorizontalSlider" onmousemove="changeTransparency(this.value);" onchange="changeTransparency(this.value);" onclick="changeTransparency(this.value);" value="0" maximum="100" minimum="0" pageincrement="1" showbuttons="true" intermediatechanges="true" slideduration="500">
+              <div data-dojo-type="dijit/form/HorizontalRule" data-dojo-props='container:"bottomDecoration", count:5, style:{height:"5px"}'></div>
+              <ol data-dojo-type="dijit/form/HorizontalRuleLabels" data-dojo-props='container:"bottomDecoration", style:{height:"1em",fontSize:"90%"}'>
+                <li>0</li>
+                <li>100</li>
+              </ol>
+            </div>
+            <br />
+            <button data-dojo-type="dijit/form/Button" data-dojo-id="analysis" onclick="changeRFT();" type="button">Analyze</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
