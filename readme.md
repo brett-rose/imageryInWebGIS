@@ -1,5 +1,5 @@
 ##Imagery Examples in the JavaScript API
-Originally Developed by Wenxue Ju (@wju)
+Originally Developed by Wenxue Ju [@wju](https://github.com/wju)
 ###These are the javascript code samples for the Esri technical workshop: Imagery in a WebGIS
 Currently using ArcGIS JavaScript API 3.13
 
