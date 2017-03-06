@@ -1,7 +1,9 @@
 ##Imagery Examples in the JavaScript API
-Originally Developed by Wenxue Ju [@wju](https://github.com/wju)
+Originally Developed by Wenxue Ju [@wju](https://github.com/wju) and Naila Khan [nkhan07](https://github.com/nkhan07)
 ###These are the javascript code samples for the Esri technical workshop: Imagery in a WebGIS
 Currently using ArcGIS JavaScript API 3.13
+
+[Try now](http://dtc-sci01.esri.com/imageryAPIDemos/)
 
 The samples include: 
 * Rendering rasters using ArcGISImageServiceLayer and RasterLayer.
@@ -12,13 +14,13 @@ The samples include:
 * Visualizing oblique imagery and performing building height measurements.
 
 1. Deployment instruction:
-Unzip to your web server, e.g. 'c:\inetpub\wwwroot\imagery2016' 
-Access them through your web server: e.g. http://localhost/imagery2016
+Unzip to your web server, e.g. 'c:\inetpub\wwwroot\imageryInWebGIS' 
+Access them through your web server: e.g. http://localhost/imageryInWebGIS
 Use Chrome if possible as these samples were not well tested on other browsers.
 
 2. Samples
 
-Please see http://localhost/imagery2016 for a list of samples.
+Please see http://localhost/imageryInWebGIS for a list of samples.
 
 Some samples may require an ArcGIS online organization account to access the image services.
 
